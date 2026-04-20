@@ -82,7 +82,7 @@ async function handleAdvance(): Promise<void> {
         </div>
         <div class="flex items-center justify-between">
           <dt class="text-slate-600">
-            İlan Ajanı
+            İlan Danışmanı
             <span class="text-slate-400">
               ({{ transaction.listingAgent.name }})
             </span>
@@ -97,7 +97,7 @@ async function handleAdvance(): Promise<void> {
         </div>
         <div class="flex items-center justify-between">
           <dt class="text-slate-600">
-            Satış Ajanı
+            Satış Danışmanı
             <span class="text-slate-400">
               ({{ transaction.sellingAgent.name }})
             </span>

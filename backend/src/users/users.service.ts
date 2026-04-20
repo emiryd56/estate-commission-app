@@ -55,6 +55,13 @@ export class UsersService {
     return user;
   }
 
+  async findByEmailWithPassword(email: string): Promise<UserDocument | null> {
+    return this.userModel
+      .findOne({ email: email.toLowerCase().trim() })
+      .select('+password')
+      .exec();
+  }
+
   private isDuplicateKeyError(error: unknown): error is MongoWriteError {
     return (
       typeof error === 'object' &&

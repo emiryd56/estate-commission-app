@@ -1,18 +1,20 @@
 type ApiClient = ReturnType<typeof $fetch.create>
 
-let cachedFetch: ApiClient | undefined
-
 export function useApi(): ApiClient {
-  if (cachedFetch) {
-    return cachedFetch
-  }
-
   const config = useRuntimeConfig()
+  const tokenCookie = useCookie<string | null>('token')
 
-  cachedFetch = $fetch.create({
+  return $fetch.create({
     baseURL: config.public.apiBase,
     headers: {
       Accept: 'application/json',
+    },
+    onRequest({ options }) {
+      if (tokenCookie.value) {
+        const headers = new Headers(options.headers)
+        headers.set('Authorization', `Bearer ${tokenCookie.value}`)
+        options.headers = headers
+      }
     },
     onResponseError({ response }) {
       const message =
@@ -21,6 +23,4 @@ export function useApi(): ApiClient {
       console.error(`[API ${response.status}]`, message)
     },
   })
-
-  return cachedFetch
 }

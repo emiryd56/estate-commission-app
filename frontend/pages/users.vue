@@ -55,8 +55,8 @@ function roleBadgeClass(role: User['role']): string {
 
 function roleLabel(role: User['role']): string {
   const map: Record<UserRole, string> = {
-    [UserRole.ADMIN]: 'Yönetici',
-    [UserRole.AGENT]: 'Ajan',
+    [UserRole.ADMIN]: 'Admin',
+    [UserRole.AGENT]: 'Danışman',
   }
   return map[role]
 }
@@ -65,9 +65,9 @@ function roleLabel(role: User['role']): string {
 <template>
   <div>
     <header class="mb-8">
-      <h1 class="text-2xl font-bold text-slate-900">Kullanıcılar</h1>
+      <h1 class="text-2xl font-bold text-slate-900">Danışmanlar</h1>
       <p class="mt-1 text-sm text-slate-500">
-        Sistemdeki yönetici ve ajanları buradan yönetin.
+        Sistemdeki admin ve danışmanları buradan yönetin.
       </p>
     </header>
 
@@ -75,7 +75,7 @@ function roleLabel(role: User['role']): string {
       <section class="lg:col-span-1">
         <div class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <h2 class="mb-4 text-base font-semibold text-slate-900">
-            Yeni Kullanıcı Ekle
+            Yeni Danışman Ekle
           </h2>
 
           <form class="space-y-4" @submit.prevent="handleSubmit">
@@ -133,8 +133,8 @@ function roleLabel(role: User['role']): string {
                 v-model="form.role"
                 class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
               >
-                <option :value="UserRole.AGENT">Ajan</option>
-                <option :value="UserRole.ADMIN">Yönetici</option>
+                <option :value="UserRole.AGENT">Danışman</option>
+                <option :value="UserRole.ADMIN">Admin</option>
               </select>
             </div>
 
@@ -167,7 +167,7 @@ function roleLabel(role: User['role']): string {
         <div class="rounded-lg border border-slate-200 bg-white shadow-sm">
           <header class="flex items-center justify-between border-b border-slate-200 px-6 py-4">
             <h2 class="text-base font-semibold text-slate-900">
-              Mevcut Kullanıcılar
+              Mevcut Danışmanlar
             </h2>
             <span
               class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700"
@@ -181,7 +181,7 @@ function roleLabel(role: User['role']): string {
           </div>
 
           <div v-else-if="!hasUsers" class="p-6 text-sm text-slate-500">
-            Henüz kullanıcı eklenmemiş.
+            Henüz danışman eklenmemiş.
           </div>
 
           <ul v-else class="divide-y divide-slate-200">
