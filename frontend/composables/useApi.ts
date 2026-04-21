@@ -16,11 +16,20 @@ export function useApi(): ApiClient {
         options.headers = headers
       }
     },
-    onResponseError({ response }) {
+    async onResponseError({ response }) {
+      if (response.status === 401) {
+        tokenCookie.value = null
+        if (import.meta.client) {
+          await navigateTo('/login')
+        }
+        return
+      }
       const message =
         (response._data as { message?: string | string[] } | undefined)
           ?.message ?? response.statusText
-      console.error(`[API ${response.status}]`, message)
+      if (import.meta.dev) {
+        console.error(`[API ${response.status}]`, message)
+      }
     },
   })
 }

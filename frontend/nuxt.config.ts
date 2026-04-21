@@ -20,7 +20,8 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: 'http://localhost:3000',
+      // Nuxt auto-overrides this with NUXT_PUBLIC_API_BASE at runtime if set
+      apiBase: 'http://localhost:3001',
     },
   },
 })

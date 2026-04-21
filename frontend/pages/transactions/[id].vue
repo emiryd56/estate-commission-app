@@ -92,6 +92,16 @@ function formatDate(value: string | Date | null): string {
   }
 }
 
+function formatRatio(value: number | undefined | null): string {
+  if (!transaction.value || transaction.value.totalFee === 0) {
+    return '—'
+  }
+  if (value === undefined || value === null) {
+    return '—'
+  }
+  return `%${Math.round((value / transaction.value.totalFee) * 100)}`
+}
+
 function stageBadgeClass(stage: TransactionStage): string {
   const map: Record<TransactionStage, string> = {
     [TransactionStage.AGREEMENT]: 'bg-slate-100 text-slate-700 ring-slate-200',
@@ -155,7 +165,7 @@ async function downloadExport(): Promise<void> {
     const blob = await response.blob()
     const disposition = response.headers.get('Content-Disposition') ?? ''
     const match = disposition.match(/filename="?([^";]+)"?/i)
-    const filename = match ? match[1] : `transaction-${transaction.value._id}.txt`
+    const filename = match ? match[1] : `transaction-${transaction.value._id}.pdf`
 
     const objectUrl = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -374,14 +384,16 @@ function goBack(): void {
               <td class="px-4 py-2 text-right font-semibold text-slate-900">
                 {{ formatCurrency(transaction.totalFee) }}
               </td>
-              <td class="px-4 py-2 text-right text-slate-500">100%</td>
+              <td class="px-4 py-2 text-right text-slate-500">%100</td>
             </tr>
             <tr>
               <td class="px-4 py-2 text-slate-700">Şirket Payı</td>
               <td class="px-4 py-2 text-right font-semibold text-slate-900">
                 {{ formatCurrency(transaction.financialBreakdown.companyCut ?? 0) }}
               </td>
-              <td class="px-4 py-2 text-right text-slate-500">50%</td>
+              <td class="px-4 py-2 text-right text-slate-500">
+                {{ formatRatio(transaction.financialBreakdown.companyCut) }}
+              </td>
             </tr>
             <tr>
               <td class="px-4 py-2 text-slate-700">
@@ -391,15 +403,7 @@ function goBack(): void {
                 {{ formatCurrency(transaction.financialBreakdown.listingAgentCut ?? 0) }}
               </td>
               <td class="px-4 py-2 text-right text-slate-500">
-                {{
-                  transaction.totalFee === 0
-                    ? '—'
-                    : `${Math.round(
-                      ((transaction.financialBreakdown.listingAgentCut ?? 0) /
-                        transaction.totalFee) *
-                        100,
-                    )}%`
-                }}
+                {{ formatRatio(transaction.financialBreakdown.listingAgentCut) }}
               </td>
             </tr>
             <tr>
@@ -410,15 +414,7 @@ function goBack(): void {
                 {{ formatCurrency(transaction.financialBreakdown.sellingAgentCut ?? 0) }}
               </td>
               <td class="px-4 py-2 text-right text-slate-500">
-                {{
-                  transaction.totalFee === 0
-                    ? '—'
-                    : `${Math.round(
-                      ((transaction.financialBreakdown.sellingAgentCut ?? 0) /
-                        transaction.totalFee) *
-                        100,
-                    )}%`
-                }}
+                {{ formatRatio(transaction.financialBreakdown.sellingAgentCut) }}
               </td>
             </tr>
           </tbody>

@@ -13,7 +13,7 @@ export class CreateUserDto {
   @MinLength(2)
   @MaxLength(80)
   name!: string;
-  
+
   @IsEmail()
   @MaxLength(120)
   email!: string;

@@ -1,0 +1,20 @@
+{
+  "name": "estate-commission-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Full-stack estate agency commission tracking system (NestJS + Nuxt 3 + MongoDB Atlas).",
+  "scripts": {
+    "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install",
+    "dev": "concurrently -n backend,frontend -c yellow,cyan \"npm --prefix backend run start:dev\" \"npm --prefix frontend run dev\"",
+    "dev:backend": "npm --prefix backend run start:dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "test": "npm --prefix backend run test",
+    "test:cov": "npm --prefix backend run test:cov",
+    "lint": "npm --prefix backend run lint",
+    "seed": "npm --prefix backend run seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

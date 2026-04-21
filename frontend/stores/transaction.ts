@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import type {
+  AdvancedFilters,
   CreateTransactionPayload,
   PaginatedResult,
   Transaction,
@@ -10,6 +11,14 @@ import type {
 
 const DEFAULT_LIMIT = 10
 
+const EMPTY_ADVANCED_FILTERS: AdvancedFilters = {
+  minTotalFee: null,
+  maxTotalFee: null,
+  startDate: null,
+  endDate: null,
+  agentId: null,
+}
+
 interface TransactionStoreState {
   transactions: Transaction[]
   total: number
@@ -18,12 +27,14 @@ interface TransactionStoreState {
   totalPages: number
   search: string
   stage: TransactionStage | null
+  advancedFilters: AdvancedFilters
   loading: boolean
   error: string | null
 }
 
 interface FetchOptions extends TransactionQuery {
   resetPage?: boolean
+  advancedFilters?: AdvancedFilters
 }
 
 export const useTransactionStore = defineStore('transactions', {
@@ -35,9 +46,36 @@ export const useTransactionStore = defineStore('transactions', {
     totalPages: 0,
     search: '',
     stage: null,
+    advancedFilters: { ...EMPTY_ADVANCED_FILTERS },
     loading: false,
     error: null,
   }),
+
+  getters: {
+    activeFilterCount: (state): number => {
+      let count = 0
+      if (state.search.trim().length > 0) count += 1
+      if (state.stage) count += 1
+      const f = state.advancedFilters
+      if (f.minTotalFee !== null) count += 1
+      if (f.maxTotalFee !== null) count += 1
+      if (f.startDate) count += 1
+      if (f.endDate) count += 1
+      if (f.agentId) count += 1
+      return count
+    },
+
+    activeAdvancedFilterCount: (state): number => {
+      let count = 0
+      const f = state.advancedFilters
+      if (f.minTotalFee !== null) count += 1
+      if (f.maxTotalFee !== null) count += 1
+      if (f.startDate) count += 1
+      if (f.endDate) count += 1
+      if (f.agentId) count += 1
+      return count
+    },
+  },
 
   actions: {
     async fetchTransactions(
@@ -48,12 +86,16 @@ export const useTransactionStore = defineStore('transactions', {
       try {
         const api = useApi()
 
-        if (options.search !== undefined) {
+        if ('search' in options && options.search !== undefined) {
           this.search = options.search
         }
-        if (options.stage !== undefined) {
+        if ('stage' in options) {
           this.stage = options.stage ?? null
         }
+        if (options.advancedFilters) {
+          this.advancedFilters = { ...options.advancedFilters }
+        }
+
         const limit = options.limit ?? this.limit
         const page = options.resetPage ? 1 : options.page ?? this.page
 
@@ -63,6 +105,22 @@ export const useTransactionStore = defineStore('transactions', {
         }
         if (this.stage) {
           query.stage = this.stage
+        }
+        const f = this.advancedFilters
+        if (f.minTotalFee !== null) {
+          query.minTotalFee = f.minTotalFee
+        }
+        if (f.maxTotalFee !== null) {
+          query.maxTotalFee = f.maxTotalFee
+        }
+        if (f.startDate) {
+          query.startDate = f.startDate
+        }
+        if (f.endDate) {
+          query.endDate = f.endDate
+        }
+        if (f.agentId) {
+          query.agentId = f.agentId
         }
 
         const response = await api<PaginatedResult<Transaction>>(
@@ -138,9 +196,26 @@ export const useTransactionStore = defineStore('transactions', {
       return this.fetchTransactions({ page })
     },
 
+    setAdvancedFilters(
+      filters: AdvancedFilters,
+    ): Promise<PaginatedResult<Transaction>> {
+      return this.fetchTransactions({
+        advancedFilters: filters,
+        resetPage: true,
+      })
+    },
+
+    resetAdvancedFilters(): Promise<PaginatedResult<Transaction>> {
+      return this.fetchTransactions({
+        advancedFilters: { ...EMPTY_ADVANCED_FILTERS },
+        resetPage: true,
+      })
+    },
+
     resetFilters(): Promise<PaginatedResult<Transaction>> {
       this.search = ''
       this.stage = null
+      this.advancedFilters = { ...EMPTY_ADVANCED_FILTERS }
       return this.fetchTransactions({ resetPage: true })
     },
   },

@@ -1,11 +1,14 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  IsDateString,
   IsEnum,
   IsInt,
+  IsMongoId,
+  IsNumber,
   IsOptional,
   IsString,
-  MaxLength,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { TransactionStage } from '../enums/transaction-stage.enum';
@@ -35,4 +38,28 @@ export class PaginationQueryDto {
   @IsOptional()
   @IsEnum(TransactionStage)
   stage?: TransactionStage;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minTotalFee?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxTotalFee?: number;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsMongoId()
+  agentId?: string;
 }

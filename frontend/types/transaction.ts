@@ -47,4 +47,17 @@ export interface TransactionQuery {
   limit?: number
   search?: string
   stage?: TransactionStage
+  minTotalFee?: number
+  maxTotalFee?: number
+  startDate?: string
+  endDate?: string
+  agentId?: string
+}
+
+export interface AdvancedFilters {
+  minTotalFee: number | null
+  maxTotalFee: number | null
+  startDate: string | null
+  endDate: string | null
+  agentId: string | null
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { CreateTransactionPayload } from '~/types'
+import type { SearchableSelectOption } from '~/components/SearchableSelect.vue'
 
 const userStore = useUserStore()
 const transactionStore = useTransactionStore()
@@ -16,6 +17,34 @@ const form = reactive<CreateTransactionPayload>({
 const isSubmitting = ref(false)
 
 const agents = computed(() => userStore.agents)
+
+const agentOptions = computed<SearchableSelectOption[]>(() =>
+  agents.value.map((agent) => ({
+    value: agent._id,
+    label: agent.name,
+    sublabel: agent.email,
+  })),
+)
+
+const listingAgentValue = computed<string | null>({
+  get: () => (form.listingAgent.length > 0 ? form.listingAgent : null),
+  set: (value) => {
+    form.listingAgent = value ?? ''
+  },
+})
+
+const sellingAgentValue = computed<string | null>({
+  get: () => (form.sellingAgent.length > 0 ? form.sellingAgent : null),
+  set: (value) => {
+    form.sellingAgent = value ?? ''
+  },
+})
+
+const isSameAgent = computed(
+  () =>
+    form.listingAgent.length > 0 &&
+    form.listingAgent === form.sellingAgent,
+)
 
 const canSubmit = computed(
   () =>
@@ -101,38 +130,39 @@ async function handleSubmit(): Promise<void> {
 
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <label for="listingAgent" class="mb-1 block text-xs font-medium text-slate-700">
+          <label class="mb-1 block text-xs font-medium text-slate-700">
             İlan Danışmanı
           </label>
-          <select
-            id="listingAgent"
-            v-model="form.listingAgent"
-            required
-            class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-          >
-            <option value="" disabled>Danışman seçin</option>
-            <option v-for="agent in agents" :key="agent._id" :value="agent._id">
-              {{ agent.name }}
-            </option>
-          </select>
+          <SearchableSelect
+            v-model="listingAgentValue"
+            :options="agentOptions"
+            placeholder="Danışman seçin"
+            search-placeholder="Danışman ara..."
+            empty-text="Eşleşen danışman bulunamadı"
+            :allow-clear="false"
+          />
         </div>
 
         <div>
-          <label for="sellingAgent" class="mb-1 block text-xs font-medium text-slate-700">
+          <label class="mb-1 block text-xs font-medium text-slate-700">
             Satış Danışmanı
           </label>
-          <select
-            id="sellingAgent"
-            v-model="form.sellingAgent"
-            required
-            class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-          >
-            <option value="" disabled>Danışman seçin</option>
-            <option v-for="agent in agents" :key="agent._id" :value="agent._id">
-              {{ agent.name }}
-            </option>
-          </select>
+          <SearchableSelect
+            v-model="sellingAgentValue"
+            :options="agentOptions"
+            placeholder="Danışman seçin"
+            search-placeholder="Danışman ara..."
+            empty-text="Eşleşen danışman bulunamadı"
+            :allow-clear="false"
+          />
         </div>
+      </div>
+
+      <div
+        v-if="isSameAgent"
+        class="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800"
+      >
+        Aynı danışman seçildi. Tamamlandığında danışman payının tamamı (%50) bu kişiye verilir.
       </div>
 
       <div

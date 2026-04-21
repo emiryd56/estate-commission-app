@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   Param,
   Patch,
   Post,
@@ -12,27 +11,31 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthenticatedUser } from '../auth/interfaces/jwt-payload.interface';
+import { UserRole } from '../users/enums/user-role.enum';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { PaginationQueryDto } from './dto/pagination-query.dto';
 import { UpdateTransactionStageDto } from './dto/update-transaction-stage.dto';
 import type { PaginatedResult } from './interfaces/paginated-result.interface';
 import { TransactionDocument } from './schemas/transaction.schema';
 import { TransactionsService } from './transactions.service';
-import {
-  buildExportFilename,
-  buildTransactionExport,
-} from './utils/transaction-export';
+import { buildPdfFilename, buildTransactionPdf } from './utils/transaction-pdf';
 
 @Controller('transactions')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.AGENT)
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
   @Post()
-  create(@Body() dto: CreateTransactionDto): Promise<TransactionDocument> {
-    return this.transactionsService.create(dto);
+  create(
+    @Body() dto: CreateTransactionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<TransactionDocument> {
+    return this.transactionsService.create(dto, user);
   }
 
   @Get()
@@ -61,18 +64,18 @@ export class TransactionsController {
   }
 
   @Get(':id/export')
-  @Header('Content-Type', 'text/plain; charset=utf-8')
   async exportOne(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<string> {
+    @Res() res: Response,
+  ): Promise<void> {
     const transaction = await this.transactionsService.findOne(id, user);
-    const filename = buildExportFilename(transaction);
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${filename}"`,
-    );
-    return buildTransactionExport(transaction);
+    const filename = buildPdfFilename(transaction);
+    const buffer = await buildTransactionPdf(transaction);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.end(buffer);
   }
 }

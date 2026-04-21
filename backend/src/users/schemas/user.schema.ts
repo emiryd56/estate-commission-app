@@ -36,11 +36,14 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-UserSchema.pre<UserDocument>('save', async function hashPasswordHook(): Promise<void> {
-  if (!this.isModified('password')) {
-    return;
-  }
+UserSchema.pre<UserDocument>(
+  'save',
+  async function hashPasswordHook(): Promise<void> {
+    if (!this.isModified('password')) {
+      return;
+    }
 
-  const salt: string = await bcrypt.genSalt(BCRYPT_SALT_ROUNDS);
-  this.password = await bcrypt.hash(this.password, salt);
-});
+    const salt: string = await bcrypt.genSalt(BCRYPT_SALT_ROUNDS);
+    this.password = await bcrypt.hash(this.password, salt);
+  },
+);
