@@ -1,111 +1,98 @@
-# Emlak Komisyon Uygulaması
+# Emlak Komisyon Uygulaması (Estate Commission App)
 
 > Diller: [English](./README.md) · **Türkçe**
 
-Emlak işlemlerini **anlaşma → kaparo → tapu → tamamlandı** akışı üzerinden
-takip eden, tamamlanan her işlemin komisyonunu ofis ve ilgili danışmanlar
-arasında otomatik olarak bölen tam yığın (full-stack) bir uygulama.
+Sözleşme → Kapora → Tapu → Tamamlandı süreçlerinden oluşan gayrimenkul işlemlerini takip etmek ve işlem başarıyla sonuçlandığında elde edilen brüt komisyonun emlak acentesi ile süreci yürüten danışmanlar arasında nasıl paylaştırılacağını otomatik olarak hesaplamak için geliştirilmiş, tam yığın (full-stack) bir web uygulamasıdır.
 
-Proje bir mono-repo olarak iki bağımsız çalıştırılabilir paketten oluşur:
+Proje, birbirlerinden bağımsız olarak çalıştırılabilen iki paketi içeren bir monorepo (tek bir depo) şeklinde tasarlanmıştır:
 
-- **`backend/`** — NestJS 11 + Mongoose + MongoDB Atlas, JWT kimlik
-  doğrulama, rol bazlı yetkilendirme (RBAC), PDF dışa aktarım, Swagger
-  belgelendirme, sağlık kontrolü, hız sınırlama.
-- **`frontend/`** — Nuxt 3 + Vue 3 Composition API, Pinia, Tailwind CSS,
-  tipli API istemcisi, aranabilir seçim kutuları, debounce'lu arama.
+- **`backend/`** — NestJS 11 + Mongoose + MongoDB Atlas geliştirme ekosistemi. Özellikleri arasında JWT kimlik doğrulama, role dayalı erişim kontrolü (RBAC), PDF dışa aktarma, Swagger API dokümantasyonu, sağlık denetimleri (health checks) ve hız sınırlaması (rate limiting) bulunmaktadır.
+- **`frontend/`** — Nuxt 3 ile Vue 3 Composition API altyapısı. Uygulamanın içerisinde durum yönetimi için Pinia, stil işlemleri için Tailwind CSS, tiplendirilmiş (type-safe) API istemcisi, gelişmiş aranabilir seçim kutuları (searchable select) ve performansı koruyan gecikmeli arama (debounced search) yapısı yer almaktadır.
 
-Mimari gerekçeler için: [`DESIGN.tr.md`](./DESIGN.tr.md).
-
-> **Terminoloji notu.** Bu dokümantasyonda ve Türkçe arayüzde, admin
-> olmayan kullanıcı rolü için **"danışman"** kelimesini kullanıyoruz. Kod
-> tabanında bu rol İngilizce emlak terimi olduğu için hâlâ
-> `UserRole.AGENT` (değer `'agent'`) olarak geçer; ikisi de aynı rolü
-> ifade eder.
+Sistemin arkasında yatan mimari kararları, tercihleri ve detaylı kurgusunu incelemek için [`DESIGN.tr.md`](./DESIGN.tr.md) belgesine göz atabilirsiniz.
 
 ---
 
 ## İçindekiler
 
-1. [Teknoloji Yığını](#teknoloji-y%C4%B1%C4%9F%C4%B1n%C4%B1)
-2. [Repo Yapısı](#repo-yap%C4%B1s%C4%B1)
+1. [Teknoloji Yığını](#teknoloji-yığını)
+2. [Depo Düzeni](#depo-düzeni)
 3. [Gereksinimler](#gereksinimler)
-4. [Hızlı Başlangıç](#h%C4%B1zl%C4%B1-ba%C5%9Flang%C4%B1%C3%A7)
-5. [Ortam Değişkenleri](#ortam-de%C4%9Fi%C5%9Fkenleri)
-6. [Varsayılan Hesapları Ekleme (Seed)](#varsay%C4%B1lan-hesaplar%C4%B1-ekleme-seed)
-7. [Uygulamayı Çalıştırma](#uygulamay%C4%B1-%C3%A7al%C4%B1%C5%9Ft%C4%B1rma)
+4. [Hızlı Başlangıç](#hızlı-başlangıç)
+5. [Ortam Değişkenleri](#ortam-değişkenleri)
+6. [Varsayılan Kullanıcıları Oluşturma (Seeding)](#varsayılan-kullanıcıları-oluşturma-seeding)
+7. [Uygulamaları Çalıştırma](#uygulamaları-çalıştırma)
 8. [Testler](#testler)
-9. [API Özeti](#api-%C3%B6zeti)
-10. [Özellik Turu](#%C3%B6zellik-turu)
-11. [Prodüksiyon Derleme ve Dağıtım](#prod%C3%BCksiyon-derleme-ve-da%C4%9F%C4%B1t%C4%B1m)
+9. [API Özeti](#apı-özeti)
+10. [Özellikler Turu](#özellikler-turu)
+11. [Derleme ve Dağıtım (Build & Deployment)](#derleme-ve-dağıtım-build--deployment)
 12. [Sorun Giderme](#sorun-giderme)
-13. [Komut Referansı](#komut-referans%C4%B1)
+13. [Komut (Script) Referansı](#komut-script-referansı)
 
 ---
 
 ## Teknoloji Yığını
 
-| Katman              | Tercih                                                           |
-| ------------------- | ---------------------------------------------------------------- |
-| Backend çalıştırıcı | Node.js 20+ / NestJS 11                                          |
-| Veritabanı          | MongoDB Atlas (Mongoose 9 üzerinden)                             |
-| Kimlik doğrulama    | JWT (`@nestjs/jwt` + `passport-jwt`), bcrypt ile parola hashleme |
-| Doğrulama           | `class-validator` + `class-transformer`, global `ValidationPipe` |
-| API dokümantasyon   | Swagger UI `/docs` (`@nestjs/swagger`)                           |
-| Güvenlik            | `helmet`, `@nestjs/throttler`, env tabanlı CORS                  |
-| PDF üretimi         | `pdfkit` + DejaVu fontları (Türkçe karakter desteği)             |
-| Sağlık kontrolü     | `@nestjs/terminus` + `/health` (Mongo ping)                      |
-| Frontend framework  | Nuxt 3 (Vue 3, Vite, Nitro)                                      |
-| Durum yönetimi      | Pinia (auth, users, transactions store'ları)                     |
-| Stil                | Tailwind CSS + özel `SearchableSelect` bileşeni                  |
-| Testler             | Jest (backend unit + e2e), `vue-tsc` / `tsc` tip kontrolleri     |
-| Araç zinciri        | ESLint + Prettier (backend), tek komutla dev için `concurrently` |
+| Katman | Tercih |
+| --- | --- |
+| Backend çalışma ortamı | Node.js 20+ / NestJS 11 |
+| Veritabanı | MongoDB Atlas (Mongoose 9 aracılığıyla erişilir) |
+| Kimlik Doğrulama | JWT (`@nestjs/jwt` + `passport-jwt`) ve bcrypt şifre şifreleme algoritması |
+| Veri Doğrulama (Validation) | `class-validator` + `class-transformer` ve projeye yayılan genel `ValidationPipe` |
+| API Dokümantasyon | `/docs` rotasında yayınlanan Swagger UI (`@nestjs/swagger`) |
+| Uygulama Güvenliği | `helmet`, `@nestjs/throttler` ve ortam değişkeni kontrollü CORS yapısı |
+| PDF Rapor Üretimi | `pdfkit` + (Türkçe karakterleri hatasız derlemesi için) DejaVu yazı tipleri |
+| Sistem Sağlık Denetimi | `@nestjs/terminus` ve `/health` adresi üzerinden MongoDB anlık ping kontrolü |
+| Frontend Altyapısı | Nuxt 3 (Vue 3, Vite, Nitro tabanlı sunucu) |
+| Durum Yönetimi (State) | Pinia (Kimlik doğrulama, kullanıcılar ve işlem süreci verilerini saklayan yapılar) |
+| Arayüz Tasarımı (CSS) | Tailwind CSS ve özel olarak yazılmış `SearchableSelect` bileşeni |
+| Test Süreçleri | Jest (Backend birim testleri ve uçtan uca (e2e) süreçler), `vue-tsc` / `tsc` tip denetimleri |
+| Geliştirici Araçları | ESLint + Prettier (Backend), `concurrently` (Aynı terminalde iki sunucuyu çalıştırma aracı) |
 
 ---
 
-## Repo Yapısı
+## Depo Düzeni
 
-```
+```text
 estate-comission-app/
-├── backend/                  # NestJS API
+├── backend/                  # NestJS API katmanı
 │   ├── src/
-│   │   ├── auth/             # JWT stratejisi, guard'lar, login/me controller'ları
-│   │   ├── users/            # Kullanıcı şeması, RBAC korumalı CRUD
-│   │   ├── transactions/     # Temel alan: şemalar, DTO'lar, servis, controller
-│   │   │   ├── utils/        # commission-calculator, stage-transitions, PDF
-│   │   │   └── schemas/      # Mongoose şemaları (transaction, stage history…)
-│   │   ├── app.controller.ts # /health endpoint'i (terminus)
-│   │   ├── app.module.ts     # Throttler, Mongoose, modül bağlantıları
-│   │   └── main.ts           # helmet, CORS, Swagger, ValidationPipe
+│   │   ├── auth/             # JWT stratejisi, erişim korumaları (guards), oturum açma (login/me) denetleyicileri
+│   │   ├── users/            # Kullanıcı veritabanı şeması ve role dayalı (RBAC) CRUD işlemleri
+│   │   ├── transactions/     # Ana sistem (domain): Şemalar, DTO'lar, servis mantığı ve denetleyiciler
+│   │   │   ├── utils/        # Komisyon hesaplama mantığı, işlem geçiş adımları, PDF üretim formülleri
+│   │   │   └── schemas/      # Mongoose MongoDB şemaları (İşlem kurguları, aşama geçmişi süreci...)
+│   │   ├── app.controller.ts # `/health` sağlığı kontrol eden uç nokta modülü
+│   │   ├── app.module.ts     # Throttler, Mongoose modüllerinin sisteme bağlandığı ana merkez
+│   │   └── main.ts           # Helmet, CORS ayarlamaları, Swagger sunucusu, ValidationPipe merkezi
 │   ├── scripts/
-│   │   ├── seed.ts           # Admin + birkaç danışman oluşturur
-│   │   └── promote-admin.ts  # Mevcut bir kullanıcıyı admin yapar
-│   ├── src/assets/fonts/     # pdfkit için DejaVu TTF'leri
-│   └── test/                 # e2e testleri
-├── frontend/                 # Nuxt 3 istemcisi
-│   ├── pages/                # login, dashboard (index), /transactions/[id], new, users
-│   ├── components/           # SearchableSelect.vue (genel combobox)
-│   ├── stores/               # Pinia store'ları (auth, user, transaction)
-│   ├── composables/useApi.ts # Bearer + 401 yönetimli tipli $fetch istemcisi
-│   ├── middleware/           # auth.global rota koruyucusu
-│   ├── plugins/              # auth plugin'i (JWT'den kullanıcıyı hidrasyon)
-│   ├── utils/                # jwt, stage etiketleri, hata biçimleyici
-│   └── types/                # Frontend tarafında DTO/arayüzler
-├── DESIGN.md / DESIGN.tr.md  # Mimari kararlar ve gerekçeler
-├── README.md / README.tr.md  # Bu dosya ve İngilizce karşılığı
-└── package.json              # Kök düzey orkestrasyon betikleri (concurrently)
+│   │   ├── seed.ts           # Sisteme bir yönetici (admin) ve deneme amaçlı birkaç danışman ekler
+│   │   └── promote-admin.ts  # Halihazırda var olan standart bir profili admin yetkilerine yükseltir
+│   ├── src/assets/fonts/     # PDF'ye gömülü şekilde eklenecek DejaVu TTF (Türkçe destekli) yazı fontları
+│   └── test/                 # NestJS uçtan uca (e2e) test senaryoları
+├── frontend/                 # Nuxt 3 tabanlı İstemci katmanı (Client)
+│   ├── pages/                # login, sistem paneli (index), /transactions/[id], yeni işlem yaratma kısımları
+│   ├── components/           # SearchableSelect.vue (Arama yapılabilen dinamik açılır menüler)
+│   ├── stores/               # Pinia depoları (auth, kullanıcı verileri ve işlemler)
+│   ├── composables/useApi.ts # Kimlik yetki kontrolü yapan ve 401 hatalarını anında yöneten $fetch arayüzü
+│   ├── middleware/           # (auth.global) İstemci tarafında her rotada çalışan güvenlik ve rol kalkanı
+│   ├── plugins/              # Uygulama yenilendiğinde JWT bilgisini alıp Pinia'ya otomatik entegre eden eklenti
+│   ├── utils/                # Token/jwt süreçleri, aşama terimleri ve standartlaşmış hata çözümleme (error) araçları
+│   └── types/                # Frontend ortamındaki kullanılan arayüzler ve Tipler (DTO'lar)
+├── DESIGN.tr.md              # Mimari kararları ve gerekçeleri anlatan teknik veri dosyası
+├── README.tr.md              # Şu anda okuduğunuz başlangıç rehberi belgesi
+└── package.json              # Alt klasörleri eş zamanlı koordine eden `concurrently` süreç dosyası
 ```
 
 ---
 
 ## Gereksinimler
 
-- **Node.js 20 LTS** (veya daha yeni) ve **npm 10+**
-- Bir **MongoDB Atlas** kümesi (ücretsiz M0 yeterlidir) veya yerel bir
-  MongoDB 6+ kurulumu. API standart `mongodb+srv://…` ya da
-  `mongodb://…` URI'larını kullanır.
-- Git (opsiyonel, klonlama için)
+- Uygulama ortamı için **Node.js 20 LTS** (veya üzeri) ve **npm 10+** yüklü olmalıdır.
+- Veri yönetimi için yerel bir MongoDB 6+ makinesi ya da ücretsiz M0 barındırma sağlayan **MongoDB Atlas** kümesi olmalıdır (Sistem doğrudan `mongodb+srv://…` ya da `mongodb://…` standart bağlantı dizesi ile çalışmaktadır).
+- Repoyu doğrudan çekebilmek için Git komut satırı aracına (opsiyoneldir) ihtiyacınız bulunmaktadır.
 
-Yerel sürümleri kontrol edin:
+Mevcut sürümünüzü teyit etmek için ilgili komutları terminalinize girin:
 
 ```bash
 node -v      # v20.x.x veya daha yeni
@@ -116,144 +103,137 @@ npm -v       # 10.x.x veya daha yeni
 
 ## Hızlı Başlangıç
 
-Taze bir klonlamadan çalışır hale gelmek için en hızlı yol:
+Eğer depoyu yeni indirdiyseniz veya klonladıysanız, projeyi ayağa kaldırmanın en kısa yolu şudur:
 
 ```bash
-# 1. Kök + backend + frontend bağımlılıklarını tek seferde kur
+# 1. Proje ana dizininde çalışarak hem backend hem de frontend içerisindeki Node modüllerini yükleyin
 npm run install:all
 
-# 2. Backend ortam dosyasını oluştur, MONGODB_URI ve JWT_SECRET'ı doldur
+# 2. Backend yapılandırmasını kopyalayın. Sonrasında .env dosyasına giderek MONGODB_URI + JWT_SECRET alanlarını mutlaka doldurun.
 cp backend/.env.example backend/.env
 $EDITOR backend/.env
 
-# 3. (Önerilen) Frontend ortam dosyasını oluştur
+# 3. (İsteğe bağlı ancak tavsiye edilir) Frontend tarafı için .env dosyası oluşturun
 cp frontend/.env.example frontend/.env
 
-# 4. Varsayılan admin + birkaç danışmanı veritabanına yükle
+# 4. Veritabanına kolay erişebilmeniz adına sistemde bir yönetici ile birlikte birkaç danışman profili yaratın
 npm run seed
 
-# 5. Backend (:3001) ve frontend (:3000) uygulamasını yan yana başlat
+# 5. Aynı pencere üzerinden Backend (3001. portta) ve Frontend'i (3000. portta) eş zamanlı olarak başlatın
 npm run dev
 ```
 
-[http://localhost:3000](http://localhost:3000) adresini açın ve seed
-betiğinin bastığı varsayılan admin bilgileriyle giriş yapın.
+Tarayıcınızda [http://localhost:3000](http://localhost:3000) adresine gidin. Başlatma kodu esnasında terminalde konsola yazdırılan varsayılan admin bilgileri (genellikle admin@firma.com / admin123 şeklindedir) ile ilk girişinizi yapın.
 
 ---
 
 ## Ortam Değişkenleri
 
-### Backend (`backend/.env`)
+### Backend Tarafı (`backend/.env`)
 
-| Değişken              | Zorunlu | Varsayılan                 | Amaç                                                                   |
-| --------------------- | ------- | -------------------------- | ---------------------------------------------------------------------- |
-| `MONGODB_URI`         | evet    | —                          | `MongooseModule` tarafından kullanılan Mongo bağlantı dizesi.          |
-| `PORT`                | hayır   | `3001`                     | NestJS sunucusunun dinlediği HTTP portu.                               |
-| `JWT_SECRET`          | evet    | —                          | JWT imzalama/doğrulama anahtarı. **Prodüksiyon öncesi mutlaka değiştirin.** |
-| `JWT_EXPIRES_IN`      | hayır   | `1d`                       | JWT ömrü (örn. `1h`, `7d`).                                            |
-| `CORS_ORIGIN`         | hayır   | `http://localhost:3000`    | İzin verilen kaynakları virgülle ayırarak yazın.                       |
-| `THROTTLE_TTL_MS`     | hayır   | `60000`                    | `@nestjs/throttler` için pencere süresi.                               |
-| `THROTTLE_LIMIT`      | hayır   | `100`                      | IP başına pencere başına izin verilen istek sayısı.                    |
-| `SEED_ADMIN_EMAIL`    | hayır   | `admin@firma.com`          | `npm run seed` tarafından oluşturulan admin e-postası.                 |
-| `SEED_ADMIN_PASSWORD` | hayır   | `admin123`                 | Admin parolası.                                                        |
-| `SEED_ADMIN_NAME`     | hayır   | `Admin User`               | Admin görünen adı.                                                     |
+| Değişken | Gerekli mi? | Varsayılan | Amacı ve İşlevi |
+| --- | --- | --- | --- |
+| `MONGODB_URI` | evet | — | Veritabanına bağlanan yapı `MongooseModule` için oluşturulmuş adres satırıdır. |
+| `PORT` | hayır | `3001` | NestJS sunucusunun kendi içinde iletişim kurmak için kullanacağı HTTP kanalıdır. |
+| `JWT_SECRET` | evet | — | Tüm JWT imgeleme/doğrulamalarında asıl yetki şifresi. **Gerçek yayına geçmeden kesinlikle değiştirilmiş olmalıdır.** |
+| `JWT_EXPIRES_IN` | hayır | `1d` | Yetki kodununun geçersizleşeceği ömür boyutu limitidir (örneğin `1h`, `7d`). |
+| `CORS_ORIGIN` | hayır | `http://localhost:3000` | Güvenlik açısından yetki onayı verilen tarayıcı tabanlı virgülle ayrılan dış bağlantı rotaları. |
+| `THROTTLE_TTL_MS` | hayır | `60000` | Rate limite sebep veren `@nestjs/throttler`'in kullandığı birimsiz pencere aralığıdır. |
+| `THROTTLE_LIMIT` | hayır | `100` | Gelen isteklerde (IP başına) tanımlanmış eşik kotası aralığıdır. |
+| `SEED_ADMIN_EMAIL` | hayır | `admin@firma.com` | `npm run seed` oluşturduğunda kurulacak ilk varsayılan admin hesabıdır. |
+| `SEED_ADMIN_PASSWORD` | hayır | `admin123` | `npm run seed` oluşturduğunda kullanılacak olan yönetici güvenlik anahtarıdır. |
+| `SEED_ADMIN_NAME` | hayır | `Admin User` | Varsayılan yöneticinin uygulamada sergilenen ismidir. |
 
-Güncel şablon: `backend/.env.example`.
+Herhangi bir eksiklik için güncel hali olan yapıları `backend/.env.example` isimli belgede bulabilirsiniz.
 
-### Frontend (`frontend/.env`)
+### Frontend Tarafı (`frontend/.env`)
 
-| Değişken                | Zorunlu | Varsayılan               | Amaç                                                                |
-| ----------------------- | ------- | ------------------------ | ------------------------------------------------------------------- |
-| `NUXT_PUBLIC_API_BASE`  | hayır   | `http://localhost:3001`  | Tarayıcının NestJS API'yi çağıracağı temel adres.                   |
+| Değişken | Gerekli mi? | Varsayılan | Amacı ve İşlevi |
+| --- | --- | --- | --- |
+| `NUXT_PUBLIC_API_BASE` | hayır | `http://localhost:3001` | Frontend panosundaki istemcilerin doğrudan muhattap olduğu ana sunucu uç yetki rotasıdır. |
 
-`runtimeConfig.public.apiBase` zaten `http://localhost:3001` olarak
-ayarlı; `.env` dosyası yalnızca API farklı bir yerdeyse (staging, prod)
-gerekir.
+Tasarım gereği `.env` değişkenlerinin içerisindeki ayar, `runtimeConfig.public.apiBase` yapılandırmasını varsayılanında test amaçlı `http://localhost:3001` değerine bağlar. Bu belge yalnızca test dışında (örn. üretim veya hazırlama sunucusunda farklı adreste iseniz) düzenlenmeyi şart kılar.
 
 ---
 
-## Varsayılan Hesapları Ekleme (Seed)
+## Varsayılan Kullanıcıları Oluşturma (Seeding)
 
-Seed betiği idempotenttir: zaten var olan hesapları atlar, sadece
-olmayanları ekler. İstediğiniz zaman çalıştırabilirsiniz:
+Baştan yükleme komutu tekrarlanabilir ve bağımsız (idempotent) çalışır; yani tabloda mevcut olanları kopyalamaz, pas geçerek yenilerini ekler. Düşünmeden bu komutu çalıştırabilirsiniz:
 
 ```bash
 npm run seed
 ```
 
-Varsayılan kimlik bilgileri (yukarıdaki env değişkenleriyle özelleştirilebilir):
+Varsayılan kurucu eklentisi (Siz yukarıdaki .env ile kurarsanız ilgili listeye sizin ayarınız geçerlidir):
 
-| Rol       | E-posta             | Parola     |
-| --------- | ------------------- | ---------- |
-| admin     | `admin@firma.com`   | `admin123` |
-| danışman  | `ayse@firma.com`    | `agent123` |
-| danışman  | `mehmet@firma.com`  | `agent123` |
-| danışman  | `zeynep@firma.com`  | `agent123` |
+| Yetki (Role) | Sisteme Giriş Maili (E-mail) | Şifre |
+| --- | --- | --- |
+| admin (Yönetici) | `admin@firma.com` | `admin123` |
+| consultant (Danışman)| `ayse@firma.com` | `agent123` |
+| consultant (Danışman)| `mehmet@firma.com` | `agent123` |
+| consultant (Danışman)| `zeynep@firma.com` | `agent123` |
 
-Yeniden seed etmeden mevcut bir kullanıcıyı admin'e yükseltmek için:
+> **Terminoloji notu:** Mimari yapı, kod satırları ve İngilizce emlak terimlerinde bahsi geçen `UserRole.AGENT` (değer: `'agent'`) rolü; Türkiye gayrimenkul kuralları ve dokümantasyonları çerçevesince "Danışman" sıfatıyla kullanılmıştır.
+
+Geçmiş profilin üzerine toptan müdahale yapmak yahut da eldeki hesaplardan birisine yönetici (admin) atamak istiyorsanız:
 
 ```bash
-npm --prefix backend run promote-admin -- birisi@example.com
+npm --prefix backend run promote-admin -- istenilengonderici@adres.com
 ```
 
 ---
 
-## Uygulamayı Çalıştırma
+## Uygulamaları Çalıştırma
 
-### Seçenek A — tek terminalde ikisi birden (önerilen)
+### 1 Seçenek — Tek Terminal (Önerilen)
 
 ```bash
 npm run dev
 ```
 
-Bu komut arka planda `backend/npm run start:dev` ve
-`frontend/npm run dev` süreçlerini `concurrently` ile yan yana çalıştırır
-ve çıktıları renk kodlar.
+Bütün süreci tek başlık üzerinden götüren `concurrently` yapısı arka planda `backend/npm run start:dev` ve `frontend/npm run dev` komutlarını aynı anda açar ve size çıktılarında ayırmanızı sağlamak için renklendirir.
 
-### Seçenek B — ayrı terminallerde
+### 2 Seçenek — Çiftli Terminaller (Ayrı Ayı Cihazlar veya Sekmeler)
 
 ```bash
-# 1. terminal
-npm run dev:backend        # NestJS → http://localhost:3001
+# Birinci Bölümdeki Başlatıcı (Terminal 1)
+npm run dev:backend        # NestJS bu eylem sonucu http://localhost:3001 ortamında çalışacaktır
 
-# 2. terminal
-npm run dev:frontend       # Nuxt   → http://localhost:3000
+# İkinci Bölümdeki Başlatıcı (Terminal 2)
+npm run dev:frontend       # Nuxt bu eylem sonucu http://localhost:3000 ortamında çalışacaktır
 ```
 
-### Backend'in ayakta olduğunu doğrulama
+### Backend uygulamasının devrede olduğunu teyit etme
 
 ```bash
 curl http://localhost:3001/health
-# → { "status": "ok", "info": { "mongodb": { "status": "up" } }, ... }
+# → Yansıma: { "status": "ok", "info": { "mongodb": { "status": "up" } }, ... }
 ```
 
-Etkileşimli API dokümantasyonu
-[http://localhost:3001/docs](http://localhost:3001/docs) adresindedir.
-"Authorize" butonuna basıp `POST /auth/login` yanıtındaki JWT'yi
-yapıştırarak korumalı endpoint'leri deneyebilirsiniz.
+Görüntüleme dökümanı ve etkileşim sistemi [http://localhost:3001/docs](http://localhost:3001/docs) menüsündedir. Yaptığınız talepler için sağ üstteki **Authorize** kısmına tıklayarak girdiğiniz `POST /auth/login` kodundan gelen token değerini ileterek denemeler yapabilirsiniz.
 
 ---
 
 ## Testler
 
 ```bash
-# Backend unit testleri (Jest — komisyon, geçişler, servis için 36 case)
+# Sistemdeki Backend unit (birim testleri) - komisyon payı vs gibi karmaşık operasyon testleri ile 36 adet varyasyon değerlendirmesi içerir:
 npm test
 
-# Backend coverage raporu (backend/coverage/ dizinine yazılır)
+# Çalışan test sonrasında rapor dökümü analizi (backend/coverage/ hedefinde klasöre kaydedilir):
 npm run test:cov
 
-# Backend e2e (Nest uygulamasını ayağa kaldırır; MONGODB_URI gerekir)
+# Genel sistem omurgasına yönelik olan uçtan uca çalıştırıcı (Sistem Mongo URI adresinizi girmiş varsaymaktadır):
 npm --prefix backend run test:e2e
 
-# Frontend tip kontrolü
+# Geliştiricinin arayüz dosyalarında hatalı referanslar arayan frontend komut doğrulama süreci:
 npm --prefix frontend exec vue-tsc -- --noEmit
 
-# Backend lint (--fix ile)
+# Sunucu taraflı kodları hizalayan format ayarlayıcısı:
 npm run lint
 ```
 
-CI dostu tek komut:
+Sürekli Entagrasyon (CI) boru hatlarında yürütülmesi için uygun format:
 
 ```bash
 npm test && npm run lint
@@ -263,25 +243,23 @@ npm test && npm run lint
 
 ## API Özeti
 
-Tüm endpoint'ler backend portunda (`3001`) yayında olur. `POST /auth/login`
-ve `GET /health` dışındaki her rota `Authorization: Bearer <jwt>` başlığı
-bekler.
+Sunucudaki (`3001`) yolları altındaki bütün ağ modülleri yetki ile çalışır. Dışarıdan gelecek erişime yalnızca `POST /auth/login` hesaba giriş adresi ve `/health` serbest bırakılmıştır; diğer her alan `Authorization: Bearer <jwt>` onayı olmadan kabul görmemektedir.
 
-| Metod | Yol                           | Roller              | Notlar                                                      |
-| ----- | ----------------------------- | ------------------- | ----------------------------------------------------------- |
-| POST  | `/auth/login`                 | herkese açık        | `{ accessToken, user }` döndürür. Dakikada 10 istekle sınırlı. |
-| GET   | `/auth/me`                    | herhangi kimliklendirilmiş | Token'dan `{ userId, email, role }` döndürür.        |
-| POST  | `/users`                      | admin               | Kullanıcı oluşturur (danışman veya admin).                  |
-| GET   | `/users`                      | admin, danışman     | Kullanıcıları listeler (seçim kutuları için).               |
-| GET   | `/transactions`               | admin, danışman     | Sayfalı liste; `search`, `stage`, fiyat/tarih/danışman filtrelerini destekler. |
-| POST  | `/transactions`               | admin, danışman     | Danışmanlar sadece kendilerini ilan veya satış danışmanı olarak seçtikleri işlemleri oluşturabilir. |
-| GET   | `/transactions/:id`           | admin, danışman     | Danışmanlar yalnızca kendi işlemlerini görür.               |
-| PATCH | `/transactions/:id/stage`     | admin, danışman     | Atomik, ileri yönlü aşama geçişi; eşzamanlı değişimde 409.  |
-| GET   | `/transactions/:id/export`    | admin, danışman     | Şık bir PDF raporu gönderir.                                |
-| GET   | `/health`                     | herkese açık        | Terminus sağlık kontrolü (Mongo ping).                      |
-| GET   | `/docs`                       | herkese açık        | Swagger UI.                                                 |
+| İşlem Tipi | İstek Uç Noktası (Path) | Erişim Rolleri | Görev İfadesi |
+| --- | --- | --- | --- |
+| POST | `/auth/login` | herhangi biri | JWT verisi sağlayan `{ accessToken, user }` dönüşü; dakikada (10) limitle korunan rotadır. |
+| GET | `/auth/me` | tüm giriş yapanlar | Sistemin kullanıcı değerini sağladığı onay alanı (`{ userId, email, role }`). |
+| POST | `/users` | admin | Sunucuya yeni danışman ya da yönetici seviyesinde bir ekip üyesi aktarma görevi alır. |
+| GET | `/users` | admin, consultant | Özellikle işlemler esnasındaki danışman menülerinde kişilerin yetkileri liste halinde görüntülenir. |
+| GET | `/transactions` | admin, consultant | Verilerin çok fonksiyonlu kombin halinde filtrelenebileceği gelişmiş çağrı alanıdır; `search`, `stage` limit gibi her opsiyona çalışır. |
+| POST | `/transactions` | admin, consultant | Danışman arkadaşın (yetkilinin) `listingAgent` (kayıtı alan taraf) veya `sellingAgent` (satıcı taraf) ibarelerinden herhangi birini dâhil ettiği oluşturma işlemini kapsar. |
+| GET | `/transactions/:id` | admin, consultant | Sadece kişilerin hak ve izinli olduğu kendi yetkili oldukları görüntülenir. |
+| PATCH | `/transactions/:id/stage`| admin, consultant | Mevcut aşamayı lakin ancak kural hatasız ve tek yönde aktarmaların güncellemeleridir; çakışmaya 409 atar. |
+| GET | `/transactions/:id/export`| admin, consultant | Aşama, döküm raporları ile finans durumunun özetlendiği şık basım formatlı sistem dosyasını çıkartır. |
+| GET | `/health` | herkese açık | Sağlık test rotalarımızı anında Mongo db döküm durumları eşliğiyle yollar. |
+| GET | `/docs` | herkese açık | Yapılan işlemleri geliştiriciler için şema listesinde barındıran okuma adresimiz. |
 
-### Örnek — giriş + liste
+### Örnek Kurulum İşlemi (Bağlantı Girişi + Listeleme Talebi)
 
 ```bash
 TOKEN=$(curl -s http://localhost:3001/auth/login \
@@ -292,158 +270,124 @@ curl -s http://localhost:3001/transactions \
   -H "Authorization: Bearer $TOKEN" | jq '.total, .data[0]'
 ```
 
-### Gelişmiş filtreler
+### Detaylı ve Gelişmiş API Filtreleme Sistem Özellikleri
 
-`GET /transactions` aşağıdaki query parametrelerini kabul eder (hepsi
-opsiyonel ve birleşebilir):
+Listeleme adresi olan `GET /transactions` işlemi aşağıdakilerin hepsinin mükemmel karmalarını üreterek değer bulabilmektedir:
 
-| Parametre     | Tip       | Etkisi                                                                   |
-| ------------- | --------- | ------------------------------------------------------------------------ |
-| `page`        | tamsayı   | Sayfa numarası (varsayılan `1`).                                         |
-| `limit`       | 1-100     | Sayfa başına kayıt (varsayılan `10`).                                    |
-| `search`      | metin     | `title` alanında büyük/küçük harf duyarsız regex araması.                |
-| `stage`       | enum      | `agreement`, `earnest_money`, `title_deed`, `completed`.                 |
-| `minTotalFee` | sayı      | `totalFee` alt sınırı.                                                   |
-| `maxTotalFee` | sayı      | `totalFee` üst sınırı.                                                   |
-| `startDate`   | ISO tarih | `createdAt >= startDate`.                                                |
-| `endDate`     | ISO tarih | `createdAt <= endDate 23:59:59`.                                         |
-| `agentId`     | ObjectId  | **Sadece admin.** Seçilen kullanıcının ilan veya satış danışmanı olduğu işlemleri filtreler. |
-
----
-
-## Özellik Turu
-
-- **Giriş akışı** — API'den dönen JWT `lax` bir cookie'de saklanır. Nuxt
-  plugin'i sayfa açılışında Pinia `auth` store'unu bu token'dan hidratlar;
-  global route middleware hem oturum hem de admin'e özel sayfaları korur
-  (token `exp` süresini kontrol eder).
-- **Pano (`/`)** — İşlemleri listeler: arama (500 ms debounce), aşama
-  filtresi, açılır "Gelişmiş Filtreleme" paneli, sayfalama, satır
-  başına hızlı aksiyonlar (Sonraki Aşama, Detay).
-- **Yeni işlem (`/transactions/new`)** — İlan ve satış danışmanı için
-  aranabilir seçim kutuları. Danışman olarak giriş yapmışsanız en az bir
-  taraf kendinizi seçmek zorundadır (sunucu tarafından zorunlu kılınır).
-- **İşlem detayı (`/transactions/[id]`)** — Özet kartı, `stageHistory`'den
-  türetilen dikey zaman çizelgesi, dinamik komisyon dağılım tablosu ve
-  `/transactions/:id/export`'u çağıran **PDF İndir** butonu.
-- **Kullanıcı yönetimi (`/users`, sadece admin)** — Danışman/admin ekleme
-  ve mevcut kullanıcıları listeleme; ad, e-posta, rol ve avatar.
-- **PDF dışa aktarımı** — Ofis kimliğiyle şık bir A4 rapor; aşama rozeti,
-  anahtar/değer tablosu, aşama geçmişi ve finansal dağılım. Türkçe
-  karakterlerin düzgün görünmesi için Nest varlık (asset) olarak
-  paketlenmiş DejaVu fontları kullanılır.
-- **Eşzamanlılık koruması** — Aşama ilerletme işlemleri
-  `findOneAndUpdate` ile mevcut aşama şartı altında yapılır; iki yazar
-  aynı anda ilerletmeye çalışırsa sadece biri başarılı olur.
-- **Denetim izi (audit trail)** — Her `StageHistoryEntry` `changedBy`
-  alanı ile hangi kullanıcının değişikliği yaptığını kaydeder, ileride
-  kullanıcı bazlı aktivite raporlamaya hazır.
+| Hedef Parametre | Tip Durumu | Etki Kapsamı |
+| --- | --- | --- |
+| `page` | int ≥1 | Yönlenilmek istenen sayfa sekmesi (Varsayılan referans: 1). |
+| `limit` | int 1-100| Sayfa içeriğindeki işlem rakamsal limiti (Varsayılan alan: 10). |
+| `search` | string | Metin satırı referans alınarak büyük/küçük (case-insensitive) regex kurgularında aratma. |
+| `stage` | enum | Durum alanları filtreleri `agreement`, `earnest_money`, `title_deed`, `completed`. |
+| `minTotalFee` | number ≥0| Beklenen kazanımın (`totalFee`) alt limit/en dip kazanç rakam verisi durumu. |
+| `maxTotalFee` | number ≥0| Belirlenen (`totalFee`) tavan kazancı ve kazancınızın aşım limiti değeri filtrelemesi. |
+| `startDate` | ISO date | Kaydın başlangıcının tarihsel limiti `createdAt >= startDate`. |
+| `endDate` | ISO date | Kaydın arama sürecinde tavan değerin saatlere vurularak oluşturulmuş sistem referans tarihi. |
+| `agentId` | ObjectId | **Tamamen yöneticilere ait kontrol modudur**. Süzgeç verilerindeki komisyoncular üzerinden hem satan (`sellingAgent`) ve ilanı bulan (`listingAgent`) rotasında filtre sağlar. |
 
 ---
 
-## Prodüksiyon Derleme ve Dağıtım
+## Özellikler Turu
 
-### Prodüksiyon derlemeleri
+- **Giriş süreç işleyişleri (Login flow)** — Gelişmiş güvenlik JWT arayüzdeki model olan `lax` isimli çerezde (cookilerde) saklanmaktadır; böylece sistem (Nuxt vb yapılandırmaları ile birlikte) tarayıcının içerisine (Pinia state altyapısına vb yerlere) aktarımları doğrudan ve zahmetsiz şekilde entegre eyler. Rota yönlendiricileri tamamen süresinin `exp` denetimi mantığıyla geçersiz yetkilerden sizleri men eder.
+- **Yönetim/Yazılım panosu (Dashboard (`/`))** — 500 ms tepkimenin kullanıldığı oldukça duyarlı "debounce" eklentisine sahiptir, ileri yönü hedefler (satır içi detaylar "View Detail vb komut sistemi" veya aşama yöneten alanların kullanımı), gelişigüzel süzgeçlemeler ("Aşamalar filtreler vb").
+- **Taze işlemler form eklentisi (Yeni - `/transactions/new`)** — Çok yüksek potansiyellilerdeki kullanıcı sayıları için üretimiştir (Temsilcilerin vb aramasındaki dinamikleştirilmesi). Form onayları yalnızca işlemi başlatan sistem aktarıcısının "kendi hesabını form kutularının 1 yerinde barındırmasına" onay kılar.
+- **İşlemin iç dökümü sayfası (`/transactions/[id]`)** — Gömülü alt dokümanlara bağlı olarak gelişmektedir (`stageHistory` verisi gibi); bu mantık tamamen renk dikey çubuğunda tarihçelere eşlik sunar. Süreç (COMPLETED) kapanışında, her kişinin kendi kazancının şeffaf net dökümü hesap dökümü tablolarında paylaşılır aynı anda pdf dökümü aktarılır hale de geçirilir (`/transactions/:id/export`).
+- **Kullanıcının yönetici kısımlarında yetki eklentisi (`/users` ve Yalnızca yöneticiye özgüdür)** — Avatar vb listeleme ayarları ve rollerde/isimlerde yeni kayıt oluşturup mevcut olanların okunaklı düzenli ekranda yayınlanmalarını sunması.
+- **Rapor ve format yapısı PDF ihracı** — Tamamen projenin kurum ruhuna hitap eyleyen, şirket tasarımı ve markalaşan renk dizininden faydalanmayı barındırarak, sayfa renk kurgusuyla tutarlık ve Türkçe altyapılı (`DejaVu`) PDF aktarımıyla tüm harfleri (`ı / ş / ç / ö / ğ / ü`) kesintisiz çıkartır.
+- **Baskılardan eş zaman koruma güvenlik eklentileri (Concurrency safety)** — İki insanın kazara, senkron saniyelerdeki çatışmalı hareketleriyle (aşama güncellemeleri/bozmaları) aynı anda iki defa güncellenmemesi (`findOneAndUpdate` vs) adına her zaman onaylı referans denetlenerek verisi tam yansıtılır hale konmuştur.
+- **Kontrol / iz sürücü (Audit)** — Eklenen sistem yapısında `StageHistoryEntry` dökümü iş ve işlemlerin tamamen kim tarafından tetiklenerek (`changedBy`) adım adım onayda/kayıt altında bırakıldığını, denetimi yapmayı netleştirir ve hesap güvenilirliği / sorgusu mekanizmalarını kuvvetlendirmesinde barınmaktadır.
+
+---
+
+## Derleme & Dağıtım
+
+### Üretim derlemesi oluşturmak (Canlıya aktarma yapıları)
 
 ```bash
 npm run build
-# ├── backend/dist/          (derlenmiş NestJS + kopyalanmış font varlıkları)
-# └── frontend/.output/      (Nitro sunucusu + public varlıklar)
+# ├── backend/dist/          (NestJS derlemelerini barındıran eklenti font/varlık havuzu)
+# └── frontend/.output/      (Özel NodeJS tabanlı Nitro/frontend paket verileri)
 
-# Derlenmiş backend'i çalıştır
+# Sistemdeki node komutuyla ana arkaplanı çalıştırarak hizmete başlatın:
 NODE_ENV=production node backend/dist/main.js
 
-# Nuxt sunucusunu çalıştır (Nitro)
+# Nuxt (Nitro motoruna vs komutlanmış şekilde) istemci alan barındırma panelinde projenizi açın:
 node frontend/.output/server/index.mjs
 ```
 
-### Backend dağıtım notları
+### Bağlayıcılar ve Arka Uç (Backend) ile barındırma süreci
 
-- Herhangi bir Node barındırması yeterli (Render, Railway, Fly.io,
-  Heroku, AWS App Runner vb.).
-- Backend env değişkenlerini runtime'da sağlayın. `.env` asla commit
-  edilmemelidir.
-- Port `3001`'i (veya `PORT` değişkenini) dışarı açın.
-- Sağlık kontrollerini `GET /health`'e yönlendirin.
-- `CORS_ORIGIN` değerini dağıttığınız frontend URL'ine ayarlayın
-  (birden çok kaynak varsa virgülle ayırarak).
+- NodeJS altyapısına doğrudan hazır tasarlanmıştır; AWS, Heroku, Render, ve Digitalocean mantıklarındaki her sisteme direkt oturtulur.
+- `.env` kodlarına güvenliği kurgulamak adına projede vs dış platforma atıp commit gönderilmemesi, tüm bu şifrelerinin uygulamanın bulunduğu asıl panel olan ortam alanındaki env yönetimine sızdırılması katı kural olarak barınmalıdır.
+- TCP yapısında bir port olan `3001` için açık olmasını/veya (`PORT` ayarlarına işlenmesini) onaydan çıkarın.
+- Load-balancer'ları, `/health` ping onay servis verileri komutlarına dayandırın.
+- Doğrulama iznini `CORS_ORIGIN` tarafına yazılmasında Frontend alan url dizinlerinizi, birden çoksa hepsini dikişsiz haritalayın.
 
-### Frontend dağıtım notları
+### Frontend Barındırma ve Yansıtmalara ait ipuçları
 
-- Nuxt 3 bir Node sunucusu olarak dağıtılabilir (herhangi Node host) ya
-  da statik export'a çevrilebilir. Varsayılan Nitro çıktısı
-  `frontend/.output/` Node preset'idir.
-- `NUXT_PUBLIC_API_BASE`'i dağıtılmış backend'in temel URL'ine ayarlayın
-  (sonunda `/` olmadan).
+- Verilen komut kurgularında standart, bağımsız yapılar olduğu da doğrudur; ancak oluşturulmuş derlemeyi (`frontend/.output/`) doğrudan bir sunucu verisinde Node mantığıyla entegre kullanırsınız.
+- Projede API rotanızı (Canlı panel için vs) `NUXT_PUBLIC_API_BASE` tarafı olarak onaylatıp ayarlara çakmalısınız (Rotanın arkasında bölü ("/") ayarı asla vb bulunmamasına referansa değer alarak yön verin).
 
-### Konteyner dostu yapı
+### Docker/İşletim Kutusu Yapıları (Container kurulumları)
 
-Repo'da Dockerfile checked in değil ama `npm run build` + `node dist/main.js`
-kombinasyonu iki aşamalı bir `Dockerfile` için doğrudan şablondur.
+Proje de varsayılan alan modüllerinde Dockerfile kurgulanmadıysa bile en basit Node tabanlı sürdürülebilirliğe `npm run build` ile entegre edilebileceği için (derleme süreci vs) çok hızlı bir (`Dockerfile`) ile ayağa kaldırılması tamamen kusursuz dizilime işaret eder.
 
 ---
 
 ## Sorun Giderme
 
-**Başlangıçta `MONGODB_URI environment variable is not defined` hatası.**
-`backend/.env` dosyasının var olduğundan ve `MONGODB_URI`'nin
-tanımlandığından emin olun. `npm run dev` kök dizinden çalıştırıldığında
-`backend/` klasörüne geçer, yani `.env` oradaki dosyadan okunur.
+**Terminal başlangıcındaki komut sonrası: `MONGODB_URI environment variable is not defined` ibaresi:**
+Kurulu sistem diziliminizde `backend/.env` klasörü altında ana adres ayarları boştur/hatalı yazılmıştır. Sistem kökünden tetiklenen işlemler vs süreç komut dizinine girdiğinden kökteki verileri tarar, adından dolayı `.env` belgenizde (ör. MongoDB URL dizesi) aratır ve onay bekler.
 
-**Girişte `429 Too Many Requests` yanıtı.**
-`POST /auth/login` brute-force saldırılarına karşı dakikada 10 istekle
-sınırlıdır. ~60 saniye bekleyip tekrar deneyin.
+**Panel girişi sırasında API uyarısı dönmesi: `429 Too Many Requests` (Çok Uzun Deneme vs/Yetki kısıtlamaları):**
+Siber sızıntılardan veya (Parola vb ezilmesinden) korunmak amacıyla `POST /auth/login` kısıtları arayüz için (`10` kota sınırıdır). Sistemin koruyucusundan sıyrılmak için (~60 saniye limitini tamamlamasını) bir dakikalık bir işlem esnesi beklenmelidir.
 
-**Aşama ilerletirken `409 Conflict`.**
-Başka bir yazar (sekme, cihaz) sizden önce ilerletmiş. İşlemi yeniden
-yükleyip tekrar deneyin; sunucu her geçiş için tek kazananı garantiler.
+**Son onay düğmesindeki basma eylemleriniz de (`409 Conflict`) red/çatışması hatası:**
+Hemen büyük oranda yan sekmede yahut da işlem yapan meslektaşınızdan dolayı döküman aynı hedefe yöneltildiği gibi iş bitmiş/taşınmıştır. Tekrar tarayıcı sayfanızı F5 üzerinden yenileyip sayfadaki en yeni dokümanın durduğu son yere bakmanızı sağlar, sistem daima son işlem sürecini koruyup ezer geçmesine izin bırakmamaktadır.
 
-**Danışman işlem oluştururken `403 Forbidden`.**
-Danışmanlar yalnızca kendilerini ilan veya satış danışmanı olarak
-seçtikleri işlemleri oluşturabilir. En az bir tarafta kendinizi seçin.
+**Bir danışmanın sıfır sistem kaydı girmesi veya form oluşturulmasındaki yetki hatası (`403 Forbidden`):**
+Her çalışan kişi oluşturulan emlak işinin mutlaka ya işi getiren (`listingAgent` sekmesine) yahut alıcı yönünden satışını yönetene (`sellingAgent` bölümünde) direkt var olması yetkisi tanımlar. Aksi halinde danışmanlar menü formlarına işlem açmak için bir isim dahi seçemeden men edilir (Listeler sadece ona yetki kısıtlananlarınca kontrolle onanır).
 
-**PDF'te Türkçe karakter yerine soru işareti.**
-`backend/src/assets/fonts/` altındaki DejaVu fontları derleme sırasında
-`backend/dist/` içine kopyalanmamış. `backend/nest-cli.json`'da
-`assets` bloğunun hâlâ duruyor olduğundan emin olup yeniden derleyin.
+**Dosya indirilen belge PDF (Export kurgusu nda) hatalı metin (Karakterlerin `???` diye sorunsuz vs çıkmaması) ile uyuşması :**
+Sunucu klasörü dahil veriler (`backend/dist/`) üzerine font dosyasını ttf olan DejaVu uzantılarını entegre aktaramadığı anlamına ulaşmaktadır. Proje test kurulum diziliminizde vs. projedeki ayarları (`backend/nest-cli.json` - assets kod alanı bloklarında vs) okumayı onaylatıp tekrar çalıştırın ("npm run build vs" vs ile) komutlarını işletin.
 
-**Frontend `http://localhost:3000/transactions` çağırıyor (404).**
-`apiBase` yanlış portu gösteriyor. Ya `NUXT_PUBLIC_API_BASE`'i ayarsız
-bırakın (varsayılan `3001`) ya da backend URL'inize açıkça yönlendirin.
+**404 dönüp sistem Nuxt Base yansıtılması (Frontend'in `http://localhost:3000/transactions/` dizge çekmesinde hata oluştuğu vs vs)**
+Projenizde varlığında api dizinine uzanan `NUXT_PUBLIC_API_BASE` sekmenin iç kısımlarının boş ya da adresin arayüz alanında asılı kalıp onay beklediğindendir. Kısaca .env yapı ayarının direkt sunucu rotasını işleyip göstertilmesi (`3001` değerlerinden arındırılıp doğru formüllerine kurgulanması vb) yeterli gelecektir.
 
-**3001 portunda `EADDRINUSE`.**
-Başka bir backend süreci bu portu tutuyor. Sonlandırın:
-
+**Veri yollarını kitleyen "Adres/Port 3001 üzerinde" `EADDRINUSE` komut tıkanıklıkları atması**
+Port tarafı aktif kullanan vs (yan terminalde çalışan arka vs port panelleriniz var demektir). Arka modül sürecini tamamen kesime uğratın:
 ```bash
 lsof -ti:3001 | xargs kill -9
 ```
 
 ---
 
-## Komut Referansı
+## Komut (Script) Referansı
 
-Kök düzey komutlar:
+Sistemi tepeden (root dizininden) yöneten ve tetikleyen eklenti komutları:
 
-| Komut                   | Açıklama                                                    |
-| ----------------------- | ----------------------------------------------------------- |
-| `npm run install:all`   | Kök, `backend/` ve `frontend/` bağımlılıklarını kurar.      |
-| `npm run dev`           | Backend + frontend'i yan yana başlatır.                     |
-| `npm run dev:backend`   | Sadece NestJS watch modunda.                                |
-| `npm run dev:frontend`  | Sadece Nuxt dev sunucusu.                                   |
-| `npm run build`         | İki uygulama için prodüksiyon derlemesi.                    |
-| `npm test`              | Backend unit testleri.                                      |
-| `npm run test:cov`      | Backend coverage raporu.                                    |
-| `npm run lint`          | Backend ESLint (`--fix`).                                   |
-| `npm run seed`          | Admin + 3 danışmanı ekler (idempotent).                     |
+| Uygulanacak Komut | Sistemde Nasıl ve Ne şekilde çalışmaya işler |
+| --- | --- |
+| `npm run install:all` | En baş sistem `backend/` den de ve `frontend/` paket dosyası olan modülleri aynı an da ana terminal de barındırır. |
+| `npm run dev` | Alt modülde olan `concurrently` sayesinde projelerin her yeri (front ile app) paralel bir entegrede yatar, başlar. |
+| `npm run dev:backend` | Doğrudan API / Backend için NestJS yi denetleme vs sürecinde başlatmayı ve derlenmeyi (watch) tetikler. |
+| `npm run dev:frontend`| Standart arayüz (Nuxt sistem dev komutuyla) yalnız kendini başlatmaya atanır. |
+| `npm run build` | Live ve Production seviyesindeki sunucu kodlarına indirgeme / basılma komut yapısını sağlar. |
+| `npm test` | Tam tekmil Backend birimi unit test akım kod senaryolarını test dökümüne başlatan süreç (Jest vs ile ektedir). |
+| `npm run test:cov` | Kaynak satır sistemimizin ne kadarına denetim işlemi testinin var oluş kapsamasını (`coverage`) derler / okur. |
+| `npm run lint` | ESLint de barındırılan kurallaştırma metotların tamamının birleştiği tamir alan komut arayüz yansıtır. |
+| `npm run seed` | Örnek hesaplarını tek komutta arıza çıkarmadan (`idempotent`) arayüze oturtacak 4 kullanıcılı komutu verisine gömer. |
 
-`backend/` içinden çalıştırılabilecek ek komutlar:
+Sadece sistemsel arka planda (`backend/` altından vb dizinden) barınan özel terminal işlemlerin referansı :
 
-| Komut                        | Açıklama                                                 |
-| ---------------------------- | -------------------------------------------------------- |
-| `npm run start:dev`          | NestJS watch modu.                                       |
-| `npm run start:prod`         | Derlenmiş `dist/main.js`'i çalıştırır.                   |
-| `npm run test:e2e`           | Jest uçtan uca test süiti.                               |
-| `npm run seed`               | `scripts/seed.ts` (ts-node ile).                         |
-| `npm run promote-admin`      | Verilen e-postayı `admin` rolüne yükseltir.              |
+| Uygulanacak Komut | Sistemde Nasıl ve Ne şekilde çalışmaya işler |
+| --- | --- |
+| `npm run start:dev` | Varsayılan NestJS (sürüm derleyerek vb süreçlerde takip eder / start durumuna) alır. |
+| `npm run start:prod` | Üretime uyumlu çalışabilecek (`dist/main.js` yi) kodlayarak çalıştırılma iznine geçiş komutlarını tetikler. |
+| `npm run test:e2e` | Komple sarmallanmış E2E süreçlerine vs sistem deneme ve yanılma Jest ortamları ayağını aktif formüle alır. |
+| `npm run seed` | Komut `ts-node` aracılığına tutulup formüller de yer barındıran `scripts/seed.ts` de saklı alanla derlenmesine yardım aracıdır.|
+| `npm run promote-admin` | Danışman sınıfının her herhangi olan vb email formulu listesini vs alarak sistem yöneticisine tam yetkili rol ekler onaylı formudur.|
 
 Keyifli kodlamalar!

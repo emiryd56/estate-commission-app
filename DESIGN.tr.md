@@ -1,50 +1,40 @@
-# Tasarım ve Mimari
+# Tasarım ve Mimari (Design & Architecture)
 
 > Diller: [English](./DESIGN.md) · **Türkçe**
 
-Bu belge **estate-comission-app** projesindeki mimari ve uygulama
-kararlarının arkasındaki gerekçeleri açıklar. Kaynak kodla birlikte
-okunmak üzere yazılmıştır: her bölüm "bu nasıl çalışıyor?" değil, "neden
-böyle yapılmış?" sorusunu yanıtlar.
-
-> **Terminoloji notu.** Bu belge ve arayüz, admin olmayan kullanıcı
-> rolünü "**danışman**" olarak adlandırır. Kod tabanında bu rol, İngilizce
-> emlak sektörünün alışılmış terimi olduğu için hâlâ `UserRole.AGENT`
-> (değer `'agent'`) şeklinde geçer. İkisi de aynı rolü ifade eder;
-> `listingAgent`, `sellingAgent`, `agentId` gibi kod/alan isimleri
-> kasıtlı olarak değiştirilmemiştir.
+Bu belge, **estate-comission-app** projesi geliştirilirken arka planda alınan mimari ve teknik kararların nedenlerini açıklamaktadır. "Bu kod ne yapıyor?" sorusundan ziyade "Bu sistem neden bu şekilde kurgulandı?" sorusuna yanıt vermeyi hedefler ve doğrudan kaynak kodlarla birlikte okunması tavsiye edilir.
 
 ## İçindekiler
 
-1. [Sistem Genel Bakış](#1-sistem-genel-bak%C4%B1%C5%9F)
-2. [Teknoloji Seçimleri](#2-teknoloji-se%C3%A7imleri)
+1. [Sisteme Genel Bakış](#1-sisteme-genel-bakiş)
+2. [Teknoloji Seçimleri](#2-teknoloji-seçimleri)
 3. [Alan Modeli (Domain Model)](#3-alan-modeli-domain-model)
-4. [Komisyon Kuralları](#4-komisyon-kurallar%C4%B1)
-5. [Aşama Durum Makinesi](#5-a%C5%9Fama-durum-makinesi)
-6. [Eşzamanlılık ve Atomik Güncellemeler](#6-e%C5%9Fzamanl%C4%B1l%C4%B1k-ve-atomik-g%C3%BCncellemeler)
-7. [Kimlik Doğrulama ve Yetkilendirme](#7-kimlik-do%C4%9Frulama-ve-yetkilendirme)
-8. [API Tasarımı](#8-api-tasar%C4%B1m%C4%B1)
-9. [Backend Modül Düzeni](#9-backend-mod%C3%BCl-d%C3%BCzeni)
+4. [Komisyon Kuralları](#4-komisyon-kurallari)
+5. [Aşama Durum Makinesi (State Machine)](#5-aşama-durum-makinesi-state-machine)
+6. [Eşzamanlılık ve Atomik İşlemler (Concurrency & Atomic Updates)](#6-eşzamanlilik-ve-atomik-işlemler-concurrency--atomic-updates)
+7. [Kimlik Doğrulama ve Yetkilendirme](#7-kimlik-doğrulama-ve-yetkilendirme)
+8. [API Tasarımı](#8-api-tasarimi)
+9. [Backend Modül Düzeni](#9-backend-modül-düzeni)
 10. [Frontend Mimarisi](#10-frontend-mimarisi)
-11. [Durum Yönetim Stratejisi](#11-durum-y%C3%B6netim-stratejisi)
-12. [UI/UX Kararları](#12-uiux-kararlar%C4%B1)
-13. [PDF Dışa Aktarım Akışı](#13-pdf-d%C4%B1%C5%9Fa-aktar%C4%B1m-ak%C4%B1%C5%9F%C4%B1)
-14. [Güvenlik Yaklaşımı](#14-g%C3%BCvenlik-yakla%C5%9F%C4%B1m%C4%B1)
-15. [Gözlemlenebilirlik ve Sağlık](#15-g%C3%B6zlemlenebilirlik-ve-sa%C4%9Fl%C4%B1k)
+11. [Durum Yönetimi (State Management) Stratejisi](#11-durum-yönetimi-state-management-stratejisi)
+12. [Kullanıcı Arayüzü ve Deneyimi (UI/UX) Kararları](#12-kullanici-arayüzü-ve-deneyimi-uiux-kararlari)
+13. [PDF Üretim Süreci](#13-pdf-üretim-süreci)
+14. [Güvenlik Yaklaşımı](#14-güvenlik-yaklaşimi)
+15. [Gözlemlenebilirlik (Observability) ve Sağlık Denetimi](#15-gözlemlenebilirlik-observability-ve-sağlik-denetimi)
 16. [Test Stratejisi](#16-test-stratejisi)
-17. [Geliştirici Deneyimi (DX)](#17-geli%C5%9Ftirici-deneyimi-dx)
-18. [Ödünleşimler ve İlerisi](#18-%C3%B6d%C3%BCnle%C5%9Fimler-ve-ilerisi)
+17. [Geliştirici Deneyimi](#17-geliştirici-deneyimi)
+18. [Ödünleşimler (Trade-offs) ve Gelecekteki Planlar](#18-ödünleşimler-trade-offs-ve-gelecekteki-planlar)
 
 ---
 
-## 1. Sistem Genel Bakış
+## 1. Sisteme Genel Bakış
 
-Uygulama klasik iki katmanlı bir SPA + REST mimarisidir:
+Uygulama arka tarafta bir REST API'ye ve ön tarafta tek sayfalık bir uygulamaya (SPA) dayanan, iki katmanlı klasik bir mimariyle tasarlanmıştır:
 
-```
+```text
 ┌──────────────────┐      HTTPS / JSON      ┌──────────────────┐
-│   Nuxt 3 istemci │ ──────────────────────▶│    NestJS API    │
-│  (tarayıcı SPA)  │ ◀──────────────────────│    (Node.js)     │
+│  Nuxt 3 İstemcisi│ ──────────────────────▶│    NestJS API    │
+│  (Tarayıcı SPA)  │ ◀──────────────────────│    (Node.js)     │
 └──────────────────┘   Authorization: Bearer└─────────┬────────┘
                                                       │ mongoose
                                                       ▼
@@ -53,208 +43,132 @@ Uygulama klasik iki katmanlı bir SPA + REST mimarisidir:
                                              └──────────────────┘
 ```
 
-- Frontend tek sayfa bir Nuxt uygulamasıdır. Kendi başına alan durumu
-  (domain state) tutmaz; her şey REST API'den çekilir ve Pinia
-  store'larında önbelleklenir.
-- Backend tek bir NestJS süreci ile durumsuz (stateless) bir REST API
-  sunar. Durum MongoDB'de yaşar; sunucu geçici istek bağlamı dışında
-  bellekte hiçbir şey tutmaz.
-- Kimlik doğrulama da durumsuzdur: erişim, bearer token olarak taşınan
-  imzalı bir JWT üzerinden verilir. Sunucu tarafında oturum deposu
-  yoktur.
+- Frontend, hiçbir kalıcı iş bilgisi tutmayan tek sayfalık bir Nuxt uygulamasıdır (SPA). İhtiyaç duyduğu verileri dinlediği REST API üzerinden yansıtır ve hız kazanmak adına Pinia depolarında (state) saklar.
+- Backend, hiçbir oturum hafızasını (session) saklamayan Node tabanlı bir NestJS uygulamasıdır. Durumlar ve kayıtlar sadece MongoDB ortamında korumaya alınır, uygulamanın aktif hafızasında isteklere verilen geçici bağlamlar haricinde hiçbir veri izi barındırılmaz.
+- Doğrulama akışı da benzer temelde durumsuz (stateless) bir mantıkla ilerler: Sisteme tanımlı oturum onayları, Bearer token adı verilen JWT anahtarları üstünden doğrulanır. İhtiyaç sebebiyle gereksiz ve ağırlaştıran oturum depolamalarından kaçınılmıştır.
 
-Bu ayrım işletim basitliği (tek Node sürecı, tek MongoDB kümesi), ilgi
-ayrımının temiz olması (SPA UX'e sahip, API kurallara sahip) ve yatay
-ölçekleme kolaylığı (stateless API → yük dengeleyici arkasına eklenen
-bir sürüm anında çalışır) için seçildi.
+Kararlaştırılan mimari ayırım ile birlikte operasyonların kontrol altında kalması hedeflenir. Nuxt SPA deneyimde kullanıcı hissini güçlendirirken Nest API bütün bir iş sürecini yönlendirir. En nihayetinde veri sistemi yormadan (load-balancer mimarileri için hızlıca şekle girebilecek statik bir ölçeğe) yayılması sonuna kadar testli ve ispatlanmış harika performansa neden olmaktadır.
 
 ---
 
 ## 2. Teknoloji Seçimleri
 
-### NestJS (backend)
+### NestJS (Backend Tarafında)
 
-- **Yapı, varsayılan olarak geliyor.** Modüller, providerlar ve
-  controller'lar, iş kuralı ağırlıklı bir uygulama için ham Express'ten
-  daha iyi bir başlangıçtır: DI, guard, pipe, decorator ve yaşam döngüsü
-  kancalarını kutudan çıkar çıkmaz alırız. Alan (domain) şu an küçük
-  olsa da komisyon mantığı, aşama makinesi ve RBAC gibi kesiklerden
-  yararlanır.
-- **Birinci sınıf doğrulama.** Global `ValidationPipe` + DTO'lar
-  "`class-validator`" sayesinde doğrulamayı prosedürel kontroller yerine
-  bildirimsel metadataya dönüştürür — eksik alan, tip zorlaması gibi
-  bütün kategoriyi kaynağında çözer.
-- **Mongo uyumu mükemmel.** `@nestjs/mongoose`, Mongoose şemalarını
-  Nest'in DI sistemine bağlar; env tabanlı yapılandırma için
-  `ConfigModule` ile harika uyum sağlar.
+- **Yapısal bütünlük:** Yalnız bir Express projesiyle koda girmektense modüller, denetleyiciler ve güvenlik sınırlarını içeren daha yetkin bir mimaridir (DI mimarisine entegredir). Komisyon yapısı ve iş yönetimi kurallarını oluşturmada sınırlandırılmış güçlü alanlara büyük yarar sağlar.
+- **Doğuştan veri yapılandırmaları:** Parametre kurallarını el ile tanımlamayı engelleyip, verilerin doğru geldiğinden (`class-validator / class-transformer` vs) net olarak onay almak, veritabanına istenmeyen bilgi işlenmesinin (`ValidationPipe` aracılığıyla) toptan önüne geçer.
+- **Güçlü MongoDB bağı:** `@nestjs/mongoose` teknolojisi Mongoose şemalarını ile NestJS'in yapısıyla oldukça tutarlı entegrasyon formülleri içerirler. Ayarlamalar oldukça kısadır.
 
 ### MongoDB + Mongoose
 
-- **Evrilen doküman şekline esneklik.** İşlemler, ebeveynleriyle birlikte
-  atomik olarak okunup yazılan `stageHistory` ve `financialBreakdown`
-  gibi gömülü alt dokümanlar taşır. Doküman tabanlı veritabanında bu
-  doğal gelir; ilişkisel bir modelde extra tablolar ve join'lerle aynı
-  değeri üretmek külfetli olurdu.
-- **Atlas avantajı.** Yönetilen Mongo, replikasyon, yedekleme ve
-  bağlantı yönetimini üstlenir. Ücretsiz M0 geliştirme ve inceleme için
-  fazlasıyla yeterlidir.
-- **Atomik doküman güncellemeleri.** Mongo'nun doküman başına atomik
-  garantisi (`findOneAndUpdate` içinde tek operasyonda `$set`, `$push`)
-  eşzamanlılık korumalı aşama geçişleri için tam ihtiyacımız olan
-  primitiftir (bkz. §6).
+- **Doküman değişikliklerin en esnek biçimi:** Aşama süreci detayları projedeki süreç formüllerince ana öğelerle (`stageHistory`, `financialBreakdown` vb anahtarlara sarılarak vs) anlık olarak çağrılır ve bütünleşik yapı olarak gönderilir: MongoDB bu bütünlüğü destekler, karmaşık formlara referans dizilimine vs gibi olaylara hiç girmeyecek alanları rahat bırakır.
+- **Atlas sistem yöneticisi:** Karmaşadan uzak hızlı çalışan bir sunucuda doğrudan Mongoose desteğine güvenilir yedekleme altyapısıyla çalışmamıza olanak sağlar (Prototipleme/denemeler için ücretsiz M0 formülü devasa bir destektir).
+- **Atomik güncellemelere sadık:** İkinci bir müdahaleye engel olmak adına MongoDB güncellemeleri (`findOneAndUpdate` içerisinde `$set` ve `$push` kurguları vb), verinin yarışıp veya üzerine yazılma çökmesinden %100 oranında kurtararak aşama yönetim makinesinin altını çizer (Detay 6. Bölümdedir).
 
-### Nuxt 3 (frontend)
+### Nuxt 3 (Frontend Tarafında)
 
-- **Vue 3 Composition API + SSR'a hazır varsayılanlar.** Bir SPA olarak
-  dağıtsak bile Nuxt'ın dosya bazlı routing'i, otomatik import sistemi,
-  Vite hattı ve Nitro sunucusu geliştirme döngüsünü hızlı, çıktıyı
-  küçük tutar.
-- **Pinia entegrasyonu.** Resmi durum yöneticisi, Nuxt'ın auto-import
-  yapısıyla sürtünmesiz çalışır. Tutkal kodu gerekmez.
-- **TypeScript sahipliği.** Şablonlar ve `<script setup lang="ts">`
-  bloklarıyla normal bileşen yazarmışçasına tam tip çıkarımı elde
-  edilir.
+- **Vue 3 ve SSR entegresi:** Saf SPA oluşturmasak dahi, Vite tabanlı Nuxt altyapımız harika geliştirme komut yapısından dolayı dosyaya atanan pratik eklenti ve yapılarına/otomatik tanıma modüllerinedir (Nitro sunucuları projeye dev hızlı performans verisi eklemesi sağlar).
+- **Pinia Desteği:** Nuxt'a direkt entegre, temiz ve hatasız işleyen yapı durumları modülüdür. Eski kurulan kompleks/karmaşık mimarilerindeki (vuex) ağırlığındansa, tüy gibi basit sistem deneyimine zemin açar.
+- **Kaliteli TypeScript yetenekleri:** Sistem içindeki prop verileri, dinamik yollanan değişkenler (`ref`) vs; arayüz de en ufak bir bileşendir dahi tam type check kontrolsüz (Type destekli tam hatasız yapılarla vs) olmamasını denetler.
 
 ### Tailwind CSS
 
-- **Utility-first, özel bir tasarım sistemi borç yapmadan tutarlılık
-  sağlar.** Piksel hizalı boşluk, erişilebilir varsayılan renkler ve
-  karanlık modu destekleyen primitifler sıfır özel CSS borcuyla gelir.
-- **Varsayılan olarak tree-shake edilir.** Son paket sadece gerçekten
-  kullanılan sınıfları taşır.
+- **Yardımcı araç sınıflarıyla muhteşem tutarlılık:** Tamamen kendine özgü bir framework arşivi barındırır. En ince ara boşluklarda piksel hesaplamalarını veya gece modu (dark-mode) geçişlerini vs en baştan yazıp karmaşık CSS mimarilerine dönüştürmemek için bulunuzmaz yapıdır.
+- **Aşırı hızlandıran Tree-shaking modülü:** Dosya derlenecek sisteme sadece yazılan ve seçilen renk veya satır katarı eklentileri (class objeleri) çıkartılıp dosyanın aşırı küçük/kompak halini güvence altına alıp fazlalık/boş komutları silmesini sağlar.
 
-### Diğer kütüphaneler
+### Diğer Güçlü Araç Setleri
 
-- **`pdfkit` + DejaVu fontları** — headless tarayıcıya gerek kalmadan
-  saf Node üzerinde PDF üretimi. TTF'leri bundle etmek, pdfkit'in
-  varsayılan fontlarının karşılayamadığı Türkçe glifleri verir.
-- **`@nestjs/throttler`, `helmet`** — pilleri dahil gelen güvenlik.
-- **`@nestjs/terminus`** — prodüksiyon seviyesinde sağlık kontrolü.
-- **`@nestjs/swagger`** — koddan üretilmiş API dokümantasyonu.
-- **`concurrently`** — küçük, bağımlılıksız, `npm run dev` için süreç
-  çoğaltıcı.
+- **`pdfkit` ve (Türkçe yapılı DejaVu fontu):** Arka plan tarayıcı gereksinimi olmayan tertemiz Node bazlı yazdırma yapısı. Türkçe komut kodlarını tam ve bozulmayan net sembollerden (Ör: ç ş ü) geçirir.
+- **`@nestjs/throttler`, `helmet`** — Projede hazır sistemsel donatılma (Dış savunma/Kalkan vb) bileşeni olan eklentiler.
+- **`@nestjs/terminus`** — Sistemin yaşamsallık belirtisini ölçen modülleri.
+- **`@nestjs/swagger`** — Yazılım için arka ekrandan kod ile senkron canlı belgeleme sunum kütüphanesidir.
+- **`concurrently`** — Uygulama süreç başlagıcını iki uçan kanat tarafı bağlamında birleştiten komutlar birliği (`npm run dev`).
 
 ---
 
 ## 3. Alan Modeli (Domain Model)
 
-Temel toplam (aggregate) **Transaction**:
+Bu yapının en kritik kurgusu **İşlem (Transaction)** verisinden temellenir:
 
 ```ts
 Transaction {
   _id: ObjectId
-  title: string                         // serbest formatlı işlem adı
+  title: string                         // Serbest formlu anlaşma başlığı
   stage: 'agreement' | 'earnest_money' | 'title_deed' | 'completed'
-  totalFee: number                      // müşteriyle anlaşılan brüt komisyon
-  listingAgent: ObjectId ref User       // ilan danışmanı
-  sellingAgent: ObjectId ref User       // satış danışmanı
-  stageHistory: StageHistoryEntry[]     // yalnızca-ekle denetim logu
-  financialBreakdown?: {                // COMPLETED'te doldurulur
-    companyCut: number
-    listingAgentCut: number
-    sellingAgentCut: number
+  totalFee: number                      // Hizmet bedeli brüt emlak komisyonu
+  listingAgent: ObjectId ref User       // İşleme onaylanacak satışı yürüten / portföy alan danışman yetkilisi
+  sellingAgent: ObjectId ref User       // Sözleşmeyi satan danışman yetkilisi
+  stageHistory: StageHistoryEntry[]     // Daimi ve salt izi bozmayan aşama dizgesi kaydı (sadece eklenir ileriye yönelik vs)
+  financialBreakdown?: {                // Süreç bitti mi işleyen kazanç havuzu (COMPLETED aşamasında otomatik belirir)
+    companyCut: number                  // Firma Kesintisi payı
+    listingAgentCut: number             // Getirmeyi Sağlayanın payı
+    sellingAgentCut: number             // İşlemi Bitiren in payı
   }
-  createdAt / updatedAt                 // timestamps: true ile
+  createdAt / updatedAt                 // İşlemi zaman kontrol onaycısı
 }
 
 StageHistoryEntry {
-  stage: TransactionStage
-  changedAt: Date
-  changedBy?: ObjectId ref User         // aşamayı kim ilerletti
+  stage: TransactionStage               // Gelen adım değeri
+  changedAt: Date                       // Tarih ve saat
+  changedBy?: ObjectId ref User         // Kim bu oynamaya işlem aşamasına karar verdi
 }
 ```
 
-Dikkat çekmek istediğimiz kararlar:
+Özellikle belirtilmesi kıymetli tasarım faktörleri:
 
-- **Gömülü `stageHistory` ve `financialBreakdown`.** Bu alt dokümanlar
-  her zaman ebeveynleriyle birlikte okunur, asla ayrı sorgulanmaz;
-  gömmek, fetch'i tek doküman ve tek round-trip olarak tutar.
-- **`totalFee`, emlak bedeli değil, anlaşılan komisyondur.** Bu iş
-  senaryosunu bire bir yansıtır: ofis baştan komisyonu belirler;
-  iç paylaşımlar bundan sonra yapılır. Türetilmiş paylaşımı brüt
-  komisyondan ayrı tutmak modelin dürüstlüğünü korur.
-- **`stage`, `stageHistory`'den denormalizedir.** Mevcut aşamayı her
-  seferinde `stageHistory`'nin son elemanından hesaplayabilirdik; üst
-  düzey bir alan olarak materyalize etmek liste sorgularını,
-  indekslemeyi ve UI render'ını basit tutar. Değişmez
-  (`stage === son(stageHistory).stage`) tek bir kod yolunda
-  (`updateStage`) zorunlu kılındığı için sapma riski yoktur.
-- **`financialBreakdown`, tamamlanana kadar opsiyoneldir.** Oluşturulurken
-  sıfırlarla doldurabilirdik ama `undefined` bırakmak "henüz para
-  paylaştırılmadı" niyetini daha net aktarır. Arayüz ve raporlar bu
-  varlığın olup olmaması üzerinden "tamamlandı mı?" sinyalini alır.
-- **`User`, flat bir `role` enum'u taşır (`admin` | `agent`).** Çoklu
-  rol ya da izin matrisine ihtiyacımız yok; erken karmaşıklık eklemek
-  spekülatif olur. (Kavramsal olarak bu rol bize danışmandır.)
+- **Dahili `stageHistory` ve `financialBreakdown` yapısı:** Model tablosunu SQL veri sistemleri mantığı yerine daha okunurluğu düz olan/tam parça gömülü şekille işlem dizgisi haline gelmesini, gereksiz işlemci ağ/ağı sorgu sistem okuma ağırlığını ezer geçer.
+- **`totalFee`, konutun piyasa satışıyla vs değil, doğrudan kabul gören komisyon tutarıyla kurgulanır:** Satış kurgulanırken brüt olan fiyat (faturası vs olan vb yetkiler rakam olarak net tanımlıdır; sistem işlerin içinde ekstra matematiklerle kendisini veya okuyucuyu aldatmasındansa bu değer direk dökümlenmiş, bölüşüme en temiz referanstan dahil eylemektedir).
+- **Projede `stage` tanımı bir sonuçtan değil ayrıntılı bellekten kurgulanır:** Proje deneme veya listedeki hız optimizeleri açısından en son ne verisi geçirilmiş diye tarihte geri taramalar vb yapmaz; doğrudan kendi ana verisinden liste halinde index lenmesi vb formlar üzerinden çok seri dönüş ile kullanıcı arayüzlerinde işlem vs rahatlığı güvencesidir. Tutarlılık, kurgunun (`updateStage`) altındaki tek merkez kuralları ile onay formundadır.
+- **Kurgudaki Finansal Kısım, kapanana dek pasif duruma itilmiştir.** Yapay veriler olan sıfır vs basıp ekranda manasız komisyon dağıtmaktansa sistemin belirsiz (`undefined`) özelliği taşıtılmış, bittikten sonra değerleri alması üzerine arayüzün direkt işlemi bu veriye dayanıp PDF sunusunu vs onaylamasında tetikleyici olmasını netleştirilmiştir.
+- **Sistem de Rol tanımı, kural dizilimi karmaşıklığını vs engelleme sadeliği hedeflidir:** Flat yapı olan (`admin` | `agent`) veri izinlerin fazlalığını söküp atan tertemiz yapıdır. Kod satırlarında Türkçe okunan ("danışman") alanı dahi proje kodlaması süreçlerinde emlak pazarındaki orijinal yapı `UserRole.AGENT`'ten (`'agent'`) baz alınmaktadır.
 
 ---
 
 ## 4. Komisyon Kuralları
 
-Kaynak: [`backend/src/transactions/utils/commission-calculator.ts`](./backend/src/transactions/utils/commission-calculator.ts).
+Kuralların referans adresi [`backend/src/transactions/utils/commission-calculator.ts`](./backend/src/transactions/utils/commission-calculator.ts) şeklindedir.
 
-Bir `totalFee` (`T`) ve iki danışman id'si (`L`, `S`) verilen saf
-fonksiyon şunu döner:
+Toplam Hizmet (`T`) üzerinden listeleme / satışı tetikleyen kişiler bazındaki (`L`, `S`) dağıtım tablosu (Pure Function - Yansıtıcısız) dizisi yapısındadır:
 
-| Senaryo                               | Ofis payı   | İlan danışmanı payı | Satış danışmanı payı |
-| ------------------------------------- | ----------- | ------------------- | -------------------- |
-| `L === S` (aynı danışman)             | `0.5 × T`   | `0.5 × T`           | `0`                  |
-| `L !== S` (farklı danışmanlar)        | `0.5 × T`   | `0.25 × T`          | `0.25 × T`           |
+| Olası Senaryo | Ajans / Kurum Payı | Kaydı (Portföyü) Alanın Kesintisi | Satış İşlemini Üstlenenin Kesintisi |
+| --- | --- | --- | --- |
+| `L === S` (İşlemi bir kişi bitirdiyse) | `0.5 × T` | `0.5 × T` | `0` |
+| `L !== S` (Danışmanlar iş paylaşımlı ise) | `0.5 × T` | `0.25 × T` | `0.25 × T` |
 
-Neden bu şekil:
+Tasarımın Formüle Uyarlama Nedenleri:
 
-- **Ofis brüt komisyonun her zaman %50'sini alır.** Oran adlandırılmış
-  bir sabit olarak durur (`AGENCY_SHARE_RATIO`) — değişmesi tek satırlık
-  bir iş + test.
-- Kalan yarı **danışman havuzu**dur; iki farklı danışman varsa eşit
-  şekilde bölünür. Aynı kişi hem ilan hem satış danışmanıysa havuzun
-  tamamını alır; satış danışmanı payı tutar çiftlenmesin diye `0`'a
-  düşer.
-- **Fonksiyon saftır.** Veritabanına dokunmaz, doküman almaz, geçersiz
-  girdi dışında (`totalFee < 0`, `NaN`) iş kuralı nedeniyle fırlatmaz.
-  Bu bilerek yapıldı: unit testi trivialdir ve fonksiyon istenen yerde
-  yeniden kullanılabilir (PDF render, ileriki raporlar, hipotetik
-  simülasyonlar).
-- **İdempotentlik.** `updateStage` atomik önkoşulla çalıştığı için (§6),
-  `calculateCommission` işlem başına en fazla bir kez çalışır —
-  `COMPLETED`'e geçişin olduğu an.
+- **Emlak şirket geliri, formülasyonda değiştirilmesi kolay bir sabiti muhafıza alınır (%50 oranıyla vs vb).** Sabit olan oranlar (`AGENCY_SHARE_RATIO`) verisi gibi adlandırılmış veriler de sunulduğundan sistemi tümüyle sarmalayan kod satır hatalarında tek kalemde değişimine uygundur.
+- Geri kalan tutar aracı / **danışmanların havuzunda paylaşım görür.** Ortak yapılan işlemsel olay yapılarında yarı yarıya süzgeç kısıtlatır eğer tek personel ise sistem payın bütününü kayda geçiren e yönlendirip satıcı ibare sisteminin "Aynı isme iki kez" veri kopyalamasını ezer sıfır bırakır.
+- **İşlemler saf bir fonksiyon üzerinden çağrı alır:** Belge yapılarından/şemalardan uzak; hatasız süzgecinden arındıran salt matematiktir (`totalFee < 0`, `NaN` sorunlarından vs). Test yazımlarında kurguyu simüle edeceğiniz her yere sonradan (BKNZ: PDF/Raporlar) hatasız uymasıdır.
+- **Tetikleyici yapı kalkanı:** Yalnızca projenin tamamen ve eksiksiz bittim sürecine geçiş yapılarından bağla (`updateStage` vs kurallarına dayalı ile `COMPLETED` verisinden tetikli), veri üzerinde her defasında çift matematik çakışmasına, bozulma / işlem sorunlu vs olmasına yer vermemektedir.
 
 ---
 
-## 5. Aşama Durum Makinesi
+## 5. Aşama Durum Makinesi (State Machine)
 
-Kaynak: [`backend/src/transactions/utils/stage-transitions.ts`](./backend/src/transactions/utils/stage-transitions.ts):
+Geçişlerin sağlandığı katman olan [`backend/src/transactions/utils/stage-transitions.ts`](./backend/src/transactions/utils/stage-transitions.ts):
 
+```text
+SÖZLEŞME (AGREEMENT) ─▶ KAPORA (EARNEST_MONEY) ─▶ TAPU (TITLE_DEED) ─▶ TAMAMLANDI (COMPLETED)
+          ▲                      ▲                         ▲                         │
+          └─ Geri dönülemeyen kesin süreç geçiş kuralları ─┘                         └─ Son durak
 ```
-ANLAŞMA ─▶ KAPARO ─▶ TAPU ─▶ TAMAMLANDI
-    ▲          ▲         ▲          │
-    └─ geri dönüş yok ───┘          └─ terminal
-```
 
-İzinli geçiş tablosu `Readonly<Record<stage, stage[]>>` şeklinde; hedefin
-dizide olup olmadığını kontrol eden `canTransition(current, next)` tek
-satırlık bir look-up'tır.
+Salt dizisel tabloya ve statik `Readonly<Record<stage, stage[]>>` verilerine uygun şekilde yazılmış, `canTransition(current, next)` işlevi vasıtasıyla referans arayabilmektedir.
 
-Neden tablo, neden ad-hoc `if` zincirleri değil:
+Adım kodlarından dizilerden (if yongalarından vs den) neden kaçınılmıştır:
 
-- **Tek doğruluk kaynağı.** Controller, servis ve testler aynı tabloya
-  başvurur. Unutulmuş bir vakayla karşılaşmak mümkün değil.
-- **İzole test.** Spec, tüm ileri geçişleri, atlamaları, geri
-  dönüşleri, aynı duruma geçişi ve terminal durumu kapsar.
-- **Kolay evrim.** "Admin override" ya da "reject" dallarını eklemek
-  tabloyu düzenlemekten ibaret, `if` zincirlerini yeniden yazmayı
-  gerektirmez.
+- **Tek karar mercii (Single source of truth).** Controller daki kurallardan bağımsız test ya da sistem süzgecini (Servisi vs de), hepsi buradaki makine tablolarından alır eyleme onar bu bir süreç aksatılmaz/atlanamaz.
+- **Sıfırdan sorunsuz deneme olanağı (İzole yapılabilecek bir komuttur).** Uygulamayı veritabanlarından izole vs sistemleri ileri kaydırma geri oynatmama/onay komutlarını kurallı testin içine şeffafta çıkartır.
+- **Tasarlanabilir Modüllerde Düzenleme (Değişim kolaylıkları):** Belirli dönem vs yöneticiler için atılacak (Yönetici geçişler vb komutları), çok karmaşık `if` döngülerindense süzgeçi tabloda değiştirip genişletebilmeye uyarlıdır (esnektir).
 
-Geriye gitmeye **bilerek** izin verilmiyor. Gerçek dünyada bir aşamayı
-geri almak (ör. tapu süreci iptal olur) bir iz bırakarak yapılmalıdır,
-sessizce undo değil. Bunu doğru modellemek gelecek işi; şimdilik terminal
-`COMPLETED` ve ileri-yönlü kural audit log'u temiz tutar.
+Kurallarımız projedeki **katı olarak süreci vs eylemleri vs geri itmesini** men etmesi üstüne kurgulanmıştır. Gerçek hayattaki kurulan mimari (satışın reddi vs), sisteme verileri bozarak undo yapılmasını (geriye dönüş iptalini süzmeyi) değil o kağıdın resmi evrak/raporlar da da olumsuz son durumu (iptalini) vb deklare eylemektedir. İptal / reddetme özellikleri kurgulamaları sonraki güncellemelere konu edilip şimdiki temiz veri sistemi yansıtması/son durum denetim komutları `COMPLETED` (yani salt/tam ve tek yönlü ile) tertemiz şema çıkarır.
 
 ---
 
-## 6. Eşzamanlılık ve Atomik Güncellemeler
+## 6. Eşzamanlılık ve Atomik İşlemler (Concurrency & Atomic Updates)
 
-`updateStage`'in erken sürümü oku-değiştir-yaz deseniyle çalışıyordu:
+Projedeki yapının `updateStage` eski denemeleri / okuma-değiştirme-ve yazdırma vs döngülerinden ibaretti:
 
 ```ts
 const doc = await model.findOne({...});
@@ -263,435 +177,231 @@ doc.stageHistory.push({...});
 await doc.save();
 ```
 
-Bu güvensiz: iki istemci aynı `AGREEMENT` dokümanını okuyup her ikisi de
-`EARNEST_MONEY` olarak kaydederse iki tane stage history girdisi doğar
-ve ileride çift-ilerletme riski çıkar.
+Bu tamamen projelere sızacak tehlikeli işlemler vs sistemleridir: 2 danışman işlemi `AGREEMENT` modunda bırakırken anında (sekme ve panellerden eş zamandaki tetiklemesinden) kurguyu `EARNEST_MONEY` e taşırken vs çift veriye sokması iki farklı `stageHistory` yapısına iki kat ilerleme eylemlerine (bozulma hatasına) iterdi.
 
-Mevcut implementasyon **Mongo'nun doküman başına atomik güncelleme**
-garantisinden, mevcut aşamayı filtreye dahil ederek yararlanır:
+Güncellenen işlemler, sadece bir referans ile güvencededir (atomic update kuralı):
 
 ```ts
 await model.findOneAndUpdate(
-  { _id, stage: current.stage },           // önkoşul
-  { $set: { stage: nextStage, /* breakdown */ },
+  { _id, stage: current.stage },           // Sadece bu durumda ön şart olarak kontrol sağlar!
+  { $set: { stage: nextStage, /* ilgili kurgular finans vs vb */ },
     $push: { stageHistory: { ... } } },
   { new: true },
 );
 ```
 
-Başka bir yazar dokümanı çoktan ilerlettiyse filtre eşleşmez,
-`findOneAndUpdate` `null` döner ve servis `ConflictException` fırlatır
-(HTTP 409). Frontend'in `useApi`'si mesajı yüzeye çıkarır; kullanıcı
-yeniler ve tekrar dener.
+Farklı ekranlardan müdahil olan yapıda ön bellek bozulursa vs vb, filtre birbiriyle uyumsuz çıkar veri `null` dönecektir; servis komutlara izin çıkartmadan API sistemi (409-ConflictException vb hatası) işleyerek döner. Frontend modülündeki `useApi` de o uyarısı yansıtarak UI ye "Süreci tazeleyin ve tekrar onayın!" diye yol gösterecektir.
 
-Neden `session.withTransaction` yerine bu:
+Çoklu oturum (session vs) işlemlerinden çok vs bu yönlendirmenin neden geçerli ve kararlı olması:
 
-- **Tek-doküman atomikliği Mongo tarafından zaten garantilidir.** Burada
-  çok dokümanlı bir transaction gerektirecek cross-document invariant
-  yok; değişiklik tek dokümanın içindedir.
-- **Replica set zorunluluğu yok.** Çok dokümanlı transaction replica set
-  veya mongos ister; atomik filtre yaklaşımı Atlas M0 dahil her Mongo
-  topolojisinde çalışır.
-- **Açık, çakışmayı görünür kılan semantik.** 409 çağırana ne olduğunu
-  net söyler ve çözümü (yeniden yükle + tekrar dene) işaret eder;
-  last-writer-wins ile yarışı gizlemez.
-
-Daha keskin hata mesajları için (`NotFoundException`, geçersiz
-geçiş/aynı aşama `BadRequestException`) atomik swap'ten önce bir
-`findOne` ön-kontrolü yapılır. Ön-kontrol yardımcı nitelikte — gerçek
-sözleşmeyi `findOneAndUpdate` filtresi uygular.
+- **MongoDB doğrudan dökümanlarda (Tekil komut vs atom yapısında vb vs) sistemi sarmalar güvence teminatlılarındandır:** Sistem dış verilerine bağlanan dış ilişki gereksinimlerinde bir (multi vs işlemler tabanlı mimariye vs) muhtaç olmadan işlemin kurgusunu/state ini güvenle ezip işlemesi de iç süreçlerin net olmasındandır.
+- **Karmaşık replika sistemlerinin devre dışı edilişi:** Atlas platformunun (M0 modelinde dahi pürüzsüz hatasız tam net süzgecindedir vs). Diğer sistemlerin vs gerektirdiği "Mongo Replica/Router vs) ağır yapısına ezen kurgudur.
+- **Netlik ve Uyarı İletkeni Olarak Saydamlık:** 409 çağrısında işlemler kapalı kutudan değil (Kim son tıklarsa o ezer hataları ile sisteme sessiz kalmasına vs izin bırakmayarak) kişiye "Dostum yeniden yüklemelisin ve bakmalısın" vs tarzındaki net ve kesin işlem rehberliğinden yansır.
 
 ---
 
 ## 7. Kimlik Doğrulama ve Yetkilendirme
 
-### Giriş
+### Oturum Açma (Login Süreci)
 
-`POST /auth/login` `{ email, password }` kabul eder. Servis, varsayılan
-`select: false` olan parola alanını `+password` ile yükler, `bcrypt.compare`
-ile doğrular ve yapılandırılmış secret + TTL ile `{ sub, email, role }`
-içeren bir JWT imzalar. Parolalar, servis katmanına asla ham halde
-ulaşmayacak şekilde Mongoose `pre('save')` kancasında bcrypt ile
-(`saltRounds = 10`) hashlenir.
+`POST /auth/login` yoluna eklenen veriler `{ email, password }` anahtarları ile yol bulmaktadır. Bu süreç normal bir veri isteğinde güvenlik maksatlı `select: false` (görüntünüme gizlenmesi) kurallarıyla vs şemada izole edilirken, şifrenin (`bcrypt.compare` dizilim şemasında vb) taramadan geçmesinden sonra (Geçerli Gizli JWT Token ı) sistem içerine onayla süzgecine sunmaktadır. Süreçlerde şifre modellemelerin vs güvenliği hook (`pre('save')`) sarmalama döngüsüne işlenerek (hashe / kodlama algoritmasına) dahil edilen parolo/kriptolu altyapımız (`saltRounds = 10` ayarında), güvenlikle saklama işlemi oluşturarak API'ye ham veriden geçirtmektedir.
 
-### Oturum taşıyıcı
+### Kimliğin Sağlaması / Oturum Transfer (Session) Kodları
 
-- JWT istemciye dönülür ve frontend tarafından **`lax` `token` cookie'sinde**
-  saklanır. `lax`, üst seviye GET'lere izin verirken cross-site
-  navigasyonlara karşı CSRF direnci sağlar; `strict`'e göre dev
-  portlarda daha affedici.
-- Cookie **`HttpOnly` değildir.** Nuxt tarafı, cookie'nin otomatik
-  gönderilmesine güvenmek yerine tipli `useApi` ile `Authorization`
-  başlığı gönderir; `HttpOnly`, bir sunucu middleware'i üzerinden
-  gitmeyi zorlardı. Ödünleşim: SPA'da bir XSS cookie'yi okuyabilir.
-  API'ye `helmet` ekleyerek ve SPA giriş yüzeyini küçük tutarak bunu
-  yumuşatıyoruz. Ürün büyürse katı CSP + HttpOnly cookie bir sonraki
-  doğal adım olur.
+- Geri iletilen onaylı sistem (JWT), tarayıcı arayüz çerez (Cookie) belleğindeki `lax` ve adlandırılan "oken" larda yansımaktadır. Lax vs özellikleri sayesinde dış sayfa sistem dolaşımlarında vs CSRF/Hack güvenliklerine kalkan sunar (Tam/Aşırı katı `strict` vs vb ye geçmeyen rahat yapıda/get metotlarına/sayfa yenilenmesi işlemler arası kolay uyumlu) tasarlanmaktadır.
+- Projede tasarıma (`HttpOnly`) vs gibi vs bir tanımlayıcı atanmamıştır. Geliştirme kolaylığı vb vs (Bir frontend / middleware proxy'sinden ek atlamalara girmemek) sebebi ile arayüzdeki "fetch" kodları üzerinden manuel okuma kurgusuna (`Authorization:`) gidilebilir şekilde eklentilere onaylamada vs vs tasarlanmıştır. Bu tarz XSS (Script saldırı dezavantajını vs) Nuxt tarafının çok ince kurgusunda/Girdi korumalarının minimal düzende işlenilmesinde Helmet ayarları / sisteminde de kapatılıp denge unsuru yakalanmıştır (Gelecekte proje de çapının tavan yapması vs CSP ya da HttpOnly çerez/server vs modülasyonu ile kusursuz tasarlanmaya entegredir vs).
 
-### Bearer başlık
+### Anahtar Başlık Yetkileri (Bearer Header)
 
-- Tüm kimliklendirilmiş çağrılar tipli `useApi` composable'ı üzerinden
-  `Authorization: Bearer <jwt>` eklenir. Merkezileşmek, ileriki
-  değişikliklerin (refresh token, retry, tracing) tek bir yerde
-  yapılabilmesini sağlar.
-- Herhangi bir `401` yanıtında composable cookie'yi temizler ve
-  `/login`'e yönlendirir. Süresi dolmuş veya iptal edilmiş token'lar,
-  "kırık API çağrıları silsilesi" yerine öngörülebilir bir UX olayına
-  dönüşür.
+- Sistemin içerisindeki modüllerin `useApi` denetçisinden geçip (`Authorization: Bearer <jwt>`) vs kodlanarak ilerletilmesidir. Eklenecek her ne yetki ve/ya istek mekanizmasının (refresh tokenları yeniden sorma log/trace okuma vs kurgularını) vs modül içerisinde bir elden yönetilir / eklentilere uyumlu/basit kılar.
+- Olası bir `401` kod yetkisine arayüzde (composables aracı ile), sistem komutunda otomatik sayfa (Cookie/tokenları da silip atarak) anında `login` (Giriş menüye vs geri postalama döngü kurgusuna ezer) yatar. Kullanıcıya net reaksiyon atar hatalar ilevs sistemi çökertip sessizce izlemek gibi bug yapılarından vs uzaktır.
 
-### RBAC
+### Rol Modelleme Süreci ve Sistem Sınırları (RBAC)
 
-- `@Roles(...roles)` decorator'ı handler/class'a metadata ekler.
-- `RolesGuard` metadata'yı okur, kimliklendirilmiş kullanıcının rolüyle
-  karşılaştırır ve eşleşmezse `ForbiddenException` fırlatır.
-- Transactions controller sınıf düzeyinde `@Roles(ADMIN, AGENT)` bildirir:
-  iki rol de her endpoint'e ulaşır. Daha sert "danışman dahil olmalı"
-  kontrolü **servis içinde** (`assertAgentInvolvement`) uygulanır çünkü
-  istek gövdesine bağlıdır, yalnızca role değil. Böylece guard'lar
-  kimlikle, servisler iş kurallarıyla ilgilenir.
-- Users controller aynı mekanizmayla `POST /users`'i admin'e özel
-  tutarken, `GET /users`'i iki role de açar — böylece danışmanlar işlem
-  oluştururken meslektaşlarını seçebilir.
+- Proje yapısı doğrudan (`@Roles(...roles)`) etiketine de entegreli sınıf kontrolü/dekore işlemleri vb komutlarına entegredir.
+- Rol yetki (guardları - `RolesGuard`), kodlardan çekilen yetkiler arasındaki sistem vs çelişmelerini (eşitsizliğini) süzer uyumsuz hallerde/içerikler `ForbiddenException` olarak fırlatılarak komutu vs bloke yapmaktadır.
+- (Danışmandan/Yöneticide) Controller/Panel kurullarının her iki iş modelini de işleme koyması durumu `@Roles(ADMIN, AGENT)` ayarlarında açık ve vs esnek olmasına mukabil verideki iş komutu süreç korumasında / Business logic ('Yoksa kişinin/danışmanın ilgisi/portföyü vs vs listesinde dahil misiniz?' denetim/engelleyici rotasında) `assertAgentInvolvement` ile sadece danışman kısıtlamasına işlenerek kalkan vs ayırımlarına çok ince net net hat çekmektedir.
+- Sistemin Kullanıcılar bölümündeki (`POST /users` - yetki kısıtı yalnız admin vb ayarlıdır lakin okuma (`GET /users` ) vs tüm yetkilerdeki form işlemlerde (Listelerde kendi adlarını vs onay/görme) seçeneğinden sebep paylaşıma sistem vs olarak tamamen izindir.
 
-### İstemcide JWT hijyeni
+### Gelişmiş/İstemci Odaklı JWT İşleyiş/Hijyeni
 
-`frontend/utils/jwt.ts` `decodeJwtPayload`, `isTokenExpired` ve
-`isValidSession` fonksiyonlarını merkezileştirir. Nuxt plugin'i soğuk
-açılışta store'u bu fonksiyonlarla hidratlar; global route middleware
-süresi dolmuş token'larda erken başarısız olur. Bu parse mantığı
-farklı yerlerde çoğaltılsaydı çok yüzeyli ince hatalar ortaya
-çıkabilirdi; tek bir "kullanılabilir oturumum var mı?" çağrısı, tutarlı
-bir noktada toplanır.
+Yetkili kurgudaki okumalardaki fonksiyon/araç (Payload deşifresi/Expiry/süre ölçer `isValidSession` vb) eklentileri arayüzün kalbi olan `utils/jwt.ts` altına odaklanıpta çalışmıştır. Sistem komut dizisinde Plugin / middleware eklenti yapısı (Sayfanın uyanışı sırasıyla, tetiklenen anki Store/Pinia sistemini vs onarması onarmasına) komutların her rotada defalarca API den onay vs (sorgusu çekerse ağırlaşma yansımaları çökme hatalarına (bugs vs)) denetim kargaşına vs engelleyecek net bir akıl (Ben hala sisteme ve yetkiye / süreye layık mıyım vs) mekanizması sistem kurgularımız ile şeffaftır vs.
 
 ---
 
 ## 8. API Tasarımı
 
-- **Kaynak-odaklı rotalar.** `/transactions`, `/transactions/:id`,
-  `/transactions/:id/stage`, `/transactions/:id/export`, `/users`,
-  `/auth/login`. Her günkü REST beklentilerine uyar.
-- **Her payload'a açık DTO + validator.** Yakalanmamış istisnalar
-  yerine net mesajlı 400, Swagger için sözleşme analizi.
-- **Birörnek sayfalama.** Uygulama boyunca
-  `PaginatedResult<T> = { data, total, page, totalPages }`. Tahmin
-  edilebilir şekil → frontend için tek bir sayfalama kod yolu.
-- **Durum kodları.** Create'te `201`, stage patch'te `200`, eşzamanlı
-  çakışmada `409`, eksik/geçersiz token'da `401`, rol uyumsuzluğunda
-  `403`, "bulunamadı veya sizin değil"de `404` (danışman kapsam filtresi
-  ile uygulanır, erişilemez dokümanlar çağırana nonexistent gibi
-  görünür).
-- **Stage güncellemesi `PATCH /transactions/:id/stage`.** Mutasyonunu
-  yaptığımız kaynak transaction'ın `stage` alanıdır; alt rota ile
-  niyeti açıkça belirtmek, ileride aynı kaynakta başka alanlara `PATCH`
-  atmayı URL çakışması yaratmadan mümkün kılar.
-- **PDF dışa aktarımı ayrı bir GET.** Aynı kaynak ağacından
-  `Content-Type: application/pdf` stream döndürmek istemci tarafını
-  basit tutar (`fetch`, blob, `URL.createObjectURL`) ve content
-  negotiation geleneklerine uyar.
-- **Filtre parametreleri opsiyonel ve eklenebilir.** Her filtre serviste
-  bağımsız `$and`-lenebilir bir parça; kombinasyonlar controller
-  tarafında ek kablolamaya gerek olmadan "zaten çalışır".
+- **Tam kaynak yönelimli Rest yapıları (Resource-oriented).** Sistem vs kurgularında (`/transactions`, `/transactions/:id`, `/stage` , `/export`) dizileri ya da `/auth` sistem komutlarında endüstri standardı Rest kurallarındaki tasarlamaya (URL dizilerine vs) uymaktadır.
+- **Her bir nesneyi yansıtan net (DTO parametresi) ve validasyonlu sistem işlemesi.** Payload kurgusu içsel çelişkisinden sızdırmasız (`400`) net mesajlama vs kurgulu ile (Exceptionları havadan tutmaktan) projenin arkaplan kodlarından arınıp Swagger UI (Arayüze) kendi API sini net sızmasına kaynak üretmektedir.
+- **Sistem listelerinde sayfalandırmada değişmezlik (Uniform pagination).** Sayfalama arayüz/kod formları (`PaginatedResult<T>`) vb her modüle de standart yansısı ("Toplam/Sayfa durumu") verisi ile Fronted'daki sayfalamak komutlarının "tek tipli yolunu vs " kurar vs eklenti vb ye pürüzsüz uyum/adapte çalışır.
+- **Standart Http Kurallı Dönütler.** İşlem onaylandı model (201 / 200), birleşme/yarış durum engeli (409 conflict vs), geçersiz/yok/token uyum arıza sorun vs de (401 ile uyarısı/redirect vs), yanlış eylem yetki talebinden (403 rol uyuşma vb engeli çıkışlarına) ve var olmama durumu/kullanıcının kendi danışman rol listesinde vs gizlenilen kayıtı tarattırma filtre (Sana kapalı vs sana da yok/ 404 eylemi) komut yapılarıyla sistem uyarlamasından faydalar.
+- **Durum verisi eylemi özel Rota / yansıtmaları vs (PATCH `/transactions/:id/stage`).** Belgenin değiştirilecek / yön verilebilir kısmı "stage" in bizzat alanındandır vs; kurguyu/adreslendirmeler yapılması ne yapmak istenirliğini dekleme yapısı ileride sistem genişletilir ya da (Ayrı alan yansıtılsın PATCH esnetilecek rotalar genişliğe / çakışmadan sarmal vs yapılsın).
+- **Yazılım sistem verisi olan Export Rota / API.** Verinin formatıyla / MIME tip yapısıyla akması `Content-Type: application/pdf` u arayüz okuma (`blob`, `createObjectURL`) arayüz işlevi bearer doğrulama yapısını bozmayıp indirme sisteminde tarayıcıyı yönelten kısıt ("Content-Disposition filename vs ") yapı komut dizisini sağlar vs.
+- **Filter (Filtreleme Arayüz sorguları / query param vs ) Seçmeli Esnek Ekleme (Additive - vs ) Sistem.** Fonksiyondan geçen istekler (And mantığı `$and`) içerilerde API Service vs alanlardan kurgu yapısı birbirini okumaya uyum sağlamadan / controller kirliliği vermesinden "kendinden yansır / just work vs ".
 
 ---
 
 ## 9. Backend Modül Düzeni
 
-```
+```text
 app.module.ts
-├── ConfigModule (global)
-├── MongooseModule (forRootAsync + ConfigService)
-├── ThrottlerModule (global guard)
+├── ConfigModule (Uygulama da dıştan yükleme sistemi kuralları)
+├── MongooseModule (Yapı olarak forRootAsync kullanarak ayar eklentilerine bağlanması vs)
+├── ThrottlerModule (Bütün uygulama çaplı APP_GUARD sistemli oran kalkanını devredekine alınımı)
 ├── TerminusModule           → /health
-├── AuthModule               → /auth/login, /auth/me
-├── UsersModule              → /users
-└── TransactionsModule       → /transactions[, /stage, /export]
+├── AuthModule               → /auth/login ve /auth/me komutu
+├── UsersModule              → /users ve CRUD ayarları
+└── TransactionsModule       → İşlemin kendince (/transactions / stage ve export yansıma uç dizileri vs)
 ```
 
-Tasarım seçimleri:
+Projede Kararları Alınmış Katmanlı Tasarı / Kurgu Seçenekleri:
 
-- **Config tek seferde, global yüklenir.** Bireysel modüller doğrudan
-  `process.env` okumak yerine `ConfigService`'i enjekte eder; env
-  yüzeyi gözden geçirilebilir ve test edilebilir hale gelir.
-- **Throttler `APP_GUARD` olarak bağlanır.** Her istek varsayılan olarak
-  sınırlı; endpoint'e özel `@Throttle` (ör. sıkı login limiti)
-  eklemelidir, bozucu değil.
-- **`AppController` sadece `/health`'e sahiptir, başka bir şey yok.**
-  Varsayılan NestJS iskelesi (`AppService.getHello`) silindi; root
-  modülde yalnızca anlamlı kod bırakmak "nest new" kokusunu engeller.
-- **Filter builder'lar `TransactionsService`'in içindedir.** Her biri
-  küçük bir Mongo filtresi parçası döndüren private metodlar
-  (`buildAccessFilter`, `buildSearchFilter`, …). Açık
-  `findAllPaginated` bunları spread ile birleştirir. Altı kısa, adlı
-  fonksiyon, 80 satırlık prosedürel bir metoddan çok daha iyi taranır
-  ve test edilir.
+- **Ayar dizinleri (Config) merkezi/baştan entegreli bir eylemdir.** Alt-modüler yansımalar ve `process.env` gibi sistem çağrısının manuel dağınıklık vs si ezen bu teknikte test edilmesine tam koruma ("Dependency injection") / `ConfigService` üzerinden geçilmesiyle verilebilmesi/rahatlılığında kodların vs temiz bırakılması.
+- **Oran Denetleyici Kalkanı `APP_GUARD` yapısı varsayımı vs).** Bütün uç komut rotaları ve de istek ağının hızla (brute) sistem saldırısı / çelişme vs kurgusundan geçmesin eylenen bu kurguya `@Throttle` sistemi komut eklenerek (Login istek süresi kotası yansısı / kısılması eklentisi vb gibi vs) modifiye / eklenebilme özelliği.
+- **Sağlıklı Boş / İzolasyon `AppController` (/health haricini vs).** Standart olan (ilk yapı test vs Hello) kod çöp vs ("Bu niye var ki kokusu/süreci ezilmiş atılmış komutlardan") vs sadeleşmiş arınmış sistem kodları temizler vs.
+- **Fitreleme yapı servis mantığı `TransactionsService` yapısından gelmesidir.** Yansımalar ve MongoDB ($and formüllerindeki vb özel / "private" alanlarca eylemli ("`buildAccessFilter` veya `buildSearchFilter`") kurgularına süzülmektedir vs listeleme paneli olan `findAllPaginated` bu kısacık formüllü bileşenlere sırtını alıp uzayan kilitlenme spagetti ("80 / kod prosedür komutu ") yerine teste el altından test edilen / okunak harika dizinidir.
 
 ---
 
 ## 10. Frontend Mimarisi
 
-```
+```text
 app.vue
-└── layouts/default.vue       (kenar çubuğu + ana alan, /login'de gizli)
+└── layouts/default.vue       (Uygulama/Menü Sidebar kurguları ve Layout sistemi, ancak /login'den saklanması dizini vs)
     └── pages/
-        ├── index.vue         (pano / işlem listesi)
-        ├── transactions/[id].vue (detay + PDF + zaman çizelgesi + dağılım)
-        ├── transactions/new.vue  (SearchableSelect ile oluşturma formu)
-        ├── users.vue             (admin-only, kullanıcı yönetimi)
-        └── login.vue             (layout'suz)
+        ├── index.vue         (dashboard ekranı panel ve liste panosu vs vs)
+        ├── transactions/[id].vue (dökümler/history zamanlaması akışı ile pdf yansısı tablosu paneli)
+        ├── transactions/new.vue  (Yeni Eklenti Emlak işleme kayıt arayüz panosu (SearchableSelect yapısı içinde vs))
+        ├── users.vue             (Liste/Ekleme arayüzü admin ayarlı)
+        └── login.vue             (Boş temiz arayüz eklentisinden soyut)
 
-plugins/auth.ts               soğuk açılışta Pinia auth store'unu hidratlar
-middleware/auth.global.ts     giriş ve admin-only rotaları korur
-composables/useApi.ts         bearer + 401 yönetimli tipli $fetch
-utils/{jwt,stage,error}.ts    store ve sayfaların paylaştığı saf yardımcılar
-components/SearchableSelect.vue   genel combobox (pano + form'da kullanılır)
-stores/{auth,user,transaction}.ts  Pinia store'ları
-types/{transaction,user}.ts   backend sözleşmelerinin aynadaki karşılıkları
+plugins/auth.ts               Uygulamanın yeniden kalkınmasında (store ve jwt test okumasına / yüklenme vs hidratı)
+middleware/auth.global.ts     Zorunlu yetki / güvenlik route arayüz rotalama (admin-only vb koruma ve giriş vs check si)
+composables/useApi.ts         Sorumluluğa bağıntılı / Bearer iletkenine / otomatik yönelim eklentisi 401 redirect (fetch) süzgeci
+utils/{jwt,stage,error}.ts    Bağıntısız (pure-işleyiş vs mağazanın kalbine hizmet komutları ayrılmış modülleri).
+components/SearchableSelect.vue  Kusursuza çalışan ComboBox (arama barındıran menüsü Dashboard vs New vs).
+stores/{auth,user,transaction}.ts  Pinia State Komut İşleci paneli depolar vs.
+types/{transaction,user}.ts   Arkadan API den verileri tanıtan (TypeScript) arayüz şemaları vs..
 ```
 
-Neden bu ayrım:
+Bölümler Ne İşe Yarar / Yapısal Split (Ayrıştırma) Tasarımı:
 
-- **Sayfalar orkestratör; store'lar veri sahibi.** Sayfalar Pinia
-  getter'ları üzerinden store'dan okur, action'ları tetikler ve DOM'a
-  yansıtır. Fetch mantığı bileşende durmaz, böylece aynı veri iki
-  sayfayı tutarlı besleyebilir.
-- **Composable'lar yan etkili primitif'leri sarar.** `useApi`, `$fetch`
-  yapılandırmasının tek noktasıdır; `useFetch`'e geçiş ya da retry
-  ekleme tek dosyalık bir değişikliktir.
-- **Middleware vs plugin.** Plugin uygulama açılışında tek kere çalışır
-  ve JWT'den store'u hidratlar; middleware her navigasyonda rotaları
-  korur. İkisini birlikte kullanmak ilk boyamanın doğruluğunu ve
-  sonraki geçişlerin hızlı (network round-trip'siz) olmasını sağlar.
-- **Paylaşılan `utils/`.** `jwt.ts` (decode/expiry), `stage.ts`
-  (etiketler, para biçimlendirme, sonraki aşama), `error.ts` (fetch
-  hata düzleyici) — hepsi saf ve unit-test edilebilir. `decodeJwtPayload`
-  ve `isFetchError`'ın önceki duplike halleri birleştirildi.
+- **Sayfaların Orkestra, Depolama Alanının Arşiv olması.** Vue kod bileşeni komutu sayfaların Pinia deposundaki ("Getters" eklentisi vs vs)'den alması ve işin komutu tetiklerine itaatinden yansır (DOM işlemleri vs). Aynı veriyle eyleşme API ağlarından (`watchers / sayfa istek`) her yerin kilitlenme sistem yığılmalarından sayfa verisi (Tutarlılık ve Hız kalibresidir).
+- **Projede Fonksiyon sarmaları "Yan etkiyi komutan kontrol (composables)" modülleridir.** `$fetch` eylemisini vs `useApi` den geçirme/sarmalayışı (token veya arıza anı geri dönüşlerin komutlarınıvs ekler). Sayfaya `useFetch` sistemi veya kurgularına (`retry / hata vb vs vs sistemi` ) eklenti yapmak tek elden ("Tek Satır Kod" değişik formüllerinden ) rahatlıkla projelendirilebilir vs eylemi.
+- **Ara Kurum ile Başlangıç Tetikleyici Felsefesi / Plugin vs Middleware sistemi.** Eklenti yapısı (plugin) açılıştan sonra (Hydrate/Pinia token çekimi ve depoyu uykudan vs onarma sistemini tetiklenmesi) sağlarken "Auth-Global Middleware" modüllerin rotaya yönüne bakmaktadır. Tüm kod yapısı her iki alanda eş zaman vs çalışmalara (`İlk Boyama Render vs` ile) hızı denetim onar ağı ezip trafik ve gecikmenin sistemsel API silsilelerini engeller verisine/işleme.
+- **Bağımsız Parça Modülleri `utils/`.** Fonksiyon (`jwt` expiry kod vs çözümlemesi) ve sistem arayüz form (`stage.ts / error.ts`) modülleri vs saf ve arı sistemlerdir (`FetchError okumaları, Döviz birimi kurgulu (pure) süzgeç yapısı` vb). Kodların / Eklentinin arasına kopya parazitleri çeker vs ("Duplicate/Middleware veya plugin ikisinde barınmasına sızan arızalarından vs kokulardan yalıtımı sistem kurgusundan test edilebilir arı sistemler süzgecidir." vb.
 
 ---
 
-## 11. Durum Yönetim Stratejisi
+## 11. Durum Yönetimi (State Management) Stratejisi
 
-Her biri tek sorumluluğa sahip üç Pinia store'u:
+Pinia mağazasında iş yükleyen sistem sorumluluğuna eylemli kurgulu yapı modülleri:
 
-- **`auth`** — kimliklendirilmiş kullanıcıyı tutar; `isAuthenticated` ve
-  `isAdmin` getter'larını; `login`, `hydrate`, `logout` action'larını
-  sunar. Cookie yaşam döngüsü buradadır, yani `token`'a yazan tek yer.
-- **`user`** — UI'nın ihtiyaç duyduğu kullanıcı listesini tutar
-  (seçiciler, admin sayfası); `agents` (danışman alt kümesi) ve
-  `getById` sunar. `fetchUsers`, `createUser` sahibidir.
-- **`transaction`** — aktif sayfadaki işlemleri, tüm filtre durumunu
-  (`search`, `stage`, `advancedFilters`), sayfalamayı ve UI
-  bayraklarını (`loading`, `error`) tutar. Action'lar fetch, create,
-  update-stage ve filtre işlemlerini birleştirir; sayfalar bildirimsel
-  kalır.
+- **`auth` Store sistemleri** — Şifre yetkili kullanıcıların verisini ("Adı, e-posta role/admin-mi vs `isAuthenticated`" durumu kurgulanmaktadır); sadece (login/logout/hidrat) kısımlarına ve sistemde Cookie dizilim eyleminden/tutulma işlemi vs (Yazma iznini yetkiye bağlı alan tek modüldür.
+- **`user` verileri depoları** — Arayüzdeki eklenti/listelere (`danışman tablosu / admin sekmesi vb` silsileden) veri (Seçme menüsündeki liste vs `agents` ve aracı eylemleri/kurgusu `getById`) eklentilerine/kurgu (`fetchUsers`, `createUser`) sorumluluğundan/panel işletişi barınır.
+- **`transaction` Sistemi deposu** — Yönetimin tam / merkezi alanından tüm işlemin (Gelişmiş Filtresi / Arama listesinden arayüz tepkilere/hata veya pagination komut (`loading` silsilesi / UI Flag)) vs eylem panellerini vs işleyiş ve verileri vs orkestrasına (`fetch / işlem / güncelle` vs silsiledir) dek arayüze/bileşen (page) lere komut (Declarative vs form vs) komutları temiz sunumla bırakım / bağlar vs işlemdir.
 
-Neden Pinia + ayrılmış store'lar, bileşen yerel `ref`ler değil:
+Component (Pinia vb kurgu yapı sistem / Store tabanına vb vs sistem kurgusu neden tasarlandı?vs):
 
-- **Sayfa arası süreklilik.** Panoyu filtreleyip
-  `/transactions/[id]`'ye gidip geri dönüldüğünde filtrelerin sıfırlanmaması
-  gerekir. Store düzeyinde state, "listeye dön" deneyiminin bağlamı
-  koruması anlamına gelir.
-- **Deterministik filtre boru hattı.** `fetchTransactions` bir options
-  bag alır; `if ('key' in options)` kontrolü kasıtlı olarak
-  `if (options.key !== undefined)`'nin yerine kondu: ikincisi "ayarlanmadı"
-  ile "açıkça temizlendi"yi ayırt edemiyordu. Bu incelik, projede
-  daha önce düzeltilen "Tüm aşamalar" bug'ının kaynağıydı.
-- **Tipli action > watcher.** Action'lar niyeti adlandırır
-  (`setAdvancedFilters`, `resetFilters`, `setPage`). Sayfalar state'i
-  doğrudan poke etmek yerine bu action'ları çağırır; güncelleme yüzeyi
-  dar kalır.
+- **Sekmeler/Alanların sürekliliğe ve korunmaya (Cross/Page memory continuity/context vs).** Yönetici Panelindeki arayüz işlemlerini (`Filtrelenmiş Veriden -> Ayrıntısına gidiş`) yapısına kurgulanıp (Geri liste/gel geri dönüşlerin eylemlerevs ) tüm filtrenin uçması (Sıfırlama hissi vs). Kurgusal sistem (`Store State-level vs`) korumadan deneyim/ux hissi arayüze (sıkıntı çıkarmasına engelle/bağlam bozdurmaması vb vs ile bağlatısına korur).
+- **Projedeki filtre eylemlik dizinin güvenilirlilik borusu/sistemi (Deterministic vs Pipeline).** Kurgunun tetiklenme süreci `fetchTransactions(options bag / torbasına vb)` üzerinden "Var veya Yok (Cleared) vs mi süzgeci `if ('key' in options)` dizilim" ayarına / (`undefined` okuyan hata vs yerine) ayar (eski arızadan `Bütün aşamalar hatasından bug lardan süzdüren`) çok başarılı uyarlama formülü.
+- **Verileri değiştirecek (Tetik mekanizmasının Actions - Watchers yer/değiştirilme felsefesine vs üstün tutulması).** Komuta eyleminden sayfaların/component lerinin Store u iştahla / elle değiştirmeden komuta `setAdvancedFilters`, `resetFilters` (işlemler vs yönelti niyetlerinden bağlamasından işleyip) sarmal hata alan daraltıma vs de üst yetenek komuta dizilimi.
 
 ---
 
-## 12. UI/UX Kararları
+## 12. Kullanıcı Arayüzü ve Deneyimi (UI/UX) Kararları
 
-- **Açılıp kapanan "Gelişmiş Filtreleme" paneli** ana filtre çubuğu
-  içinde. Varsayılan UI'yı temiz tutarken güç kullanıcısı filtrelerini
-  keşfedilebilir kılar (aktif filtre sayısı bir rozetle gösterilir).
-- **`SearchableSelect` bileşeni.** Yerel `<select>` ~20 seçenek
-  sonrasında acı verir ve aranamaz. Klavye navigasyonu, arama ve
-  temizleme destekli özel combobox onlarca danışmanla sorunsuz çalışır
-  ve formu hızlı hissettirir. Hem panonun danışman filtresinde hem de
-  yeni-işlem formunda yeniden kullanılır.
-- **Anlamsal renklerle aşama rozetleri** (slate / amber / sky /
-  emerald) tablo satırları, detay sayfası ve PDF arasında aynı şekilde
-  görünür; kullanıcı eşlemeyi bir kez öğrenir, her yerde aynı şekilde
-  okunur.
-- **Dikey zaman çizelgesi** detay sayfasında dört adımlı state
-  makinesini aynalar. "Yapıldı / şu an / bekliyor" şekil ve renk olarak
-  birbirinden ayrışır; mevcut adım bir bakışta görülür.
-- **Inline PDF indirme** `fetch` + `blob` + `URL.createObjectURL` ile
-  yapılır. Düz bir `<a href>` başlık ekleyemezdi; bu akış hem bearer
-  auth'u korur hem de sunucuya `Content-Disposition` üzerinden akıllı
-  dosya adı atamasını sağlar.
-- **Arama için 500 ms debounce** her tuş vuruşunda API'yi yormayı
-  önler. 500 ms, "tepkisel hissettiriyor" ile "makul ölçüde ucuz"
-  arasındaki yaygın bir tatlı nokta.
-- **Buton boyutlarında tutarlılık** (sabit `h-8`, `whitespace-nowrap`)
-  — küçük bir detay ama hücreler farklı uzunlukta etiketler içerse bile
-  tabloların dikeyde zıplamamasını sağlar.
+- **Gelişmiş Filtre "Advanced Filters" (Panele Gizlenilebilir/Daraltılabilir) Eklentisi** Arayüzü dar ve sıkışık duran bir panel filtresinden yormasına "Sade Panel" ayarı eyleyip gizlenen/aktif ise rozette kendini belli ettirebilen uzman filtre sistemi / gücü kurgusuna oturtumu.
+- **`SearchableSelect` Komponent Yapısı/Menüsü.** Tarayıcının ana select / menü panosundaki süzgeçler "Danışman çoklu listelerinde / (+20 üstünde listelerde aranma komut kargaşası ve form/işlem gecikmesidir vs)" iş bilinci zayıf kalarak. ComboBox kurgusuna sahip aranabilen silinen vs sistem / klavye sarmalından geçirmiş (Form Dashboard eklentilerinde ortak hızlı yapılı çalışana dönemiştir vs).
+- **Renk / Semantik Aşama Uyumu Rozet Dili (slate / amber / sky / emerald vb vs)** Sistemde satırlarda (Dashboard / Rapor Listelerinde PDF e dek eklemlinen yansıma kurgulamasından vs her renkten aşama tablosuna / göz alçaklığını "Yekten sistem öğrenme vb UX kolaylık vs silsile formülünden tanım" bağlar.
+- **Süreçlerdeki Dikey İşlem Zaman/Takip Ağacı vb dizilimler (Timeline)** Projedeki/Model makinedeki dört adımı (Makinası / Geçmiş ve Öncesindeki onay aşama şekil boyutları renk komutlarına arıza vb vs anında güncelin kavranması (Geçmiş / Güncel onay durumu) şekillenmesi ile kolay kılan netliği vb.
+- **Anlık Dosya Blob ve API çekirdek (URL.createObjectURL üzerinden okuma / pdf fetch vb vs işlemi)** Doğrudan bir link (A href vs komutundan - bearer doğrulama yapısından eksik yollamasına müracaatına) yapamayacağı korumasını vs/sistem dosya format isim (Content-Disposition vs tarayıcı aktarımı silsilesinden harici yönlendiri vs sistem arayüzüne indiri iletini atar).
+- **Yarı / Hibrid 500 Ms Bekletici Eylemi Sistem Çek/Uyarısı (Debounce arama işleyi).** Saniye de 100 kere tık / klavye işleminin API (Maliyeti aşırı / Yavaşlatıcısı vuruş) larına vs gitmesini ("Cevapsız kargaşa") formüllerince süzgeçten geçip "Hızlı ama Mantıklı ucuz yol" (Sweet - spot/gecikme) ayarlarına / formülü uyarlanısı vs.
+- **Butonlar ve Eylem Kurgularındaki Standardizasyon boylam (Action butones sabitliği (fixed `h-8`, `whitespace-nowrap`) vs.** Aşama / İşlem butonlarındaki sütun formüllerinin isim değişiklik (Tamamla Advance) harf yapı / boydan uzama tablonun çirkin sekme oynamalara gidişlerini sonlandırmasını vb ince işlenilen kalibrasyonu.
 
 ---
 
-## 13. PDF Dışa Aktarım Akışı
+## 13. PDF Üretim Süreci
 
-`GET /transactions/:id/export` `pdfkit` ile PDF üretir:
+Sistem çıktıya ulaştıran dosya servisinde (`GET /transactions/:id/export ` - pdfkit güdümlü harici bir motor yapısında komut akışıdır):
 
-1. Servis, doldurulmuş danışmanlarla işlemi yükler ve hidrate bir
-   Mongoose dokümanı döner.
-2. `buildTransactionPdf` gömülü DejaVu fontlarını (Sans + Sans Bold)
-   kaydeder; böylece Türkçe diakritler platformlar arası tutarlı
-   render edilir.
-3. `doc.on('data')` chunk'ları bir Promise içinde diziye toplanır;
-   `doc.on('end')` çözdüğünde controller buffer'ı açık `Content-Type`,
-   `Content-Length` ve `Content-Disposition` başlıklarıyla gönderir.
+1. Ana veritabını işlem formüllüsüne / komut çağrısında sistem API sinden (danışman doluları ve Mongoose süzgecinden arınmış hydrate vs belge paketi kurgulamasında sunusu/verilir).
+2. Sistem Rapor Üreticisi olan `buildTransactionPdf` modülü (Fontların DejaVu entegresi / Diacritics karakter okuma desteğinden Türkçe komutların `ı ş` vd vb yapılarından) bozuk form verisini tüm sistem çaplı pürüzsüz yazım render kalibre/onay uyarlaması ile işi alır vs.
+3. Rapor un bellekte işlenme süreceği/Buffer dökümünden listelenip "(`Promise / doc.on('data')` vs paketi" toplanan array dizi serisi vasıtasına itelenir vb; ne an iş biter onay (resolve / doc.on('end')) verirse doğrudan Header başlıkların yapısı "C-Type(PDF) vd / C-Length ve C-Disposition eklenti (Tarayıcı indirme dökülerine)" yansıttırtan net hatasız API kod sistemine atması akarak işleyiş yansısı/şarj biter.
 
-Neden doğrudan response'a stream etmek yerine "buffer → gönder":
+Buffer Sistem Bekletisi mi Yoksa (Streaming - parça silsile ) akış formunun kurgudan kaçınılması nedenleri:
 
-- **Hata yönetimi deterministik.** Font kaydı veya herhangi bir çizim
-  adımında hata atılırsa 500 temiz bir gövdeyle döner. Stream'lesek
-  hata anında başlıklar çoktan yazılmış olurdu; istemci kesik, "başarılı
-  gibi duran" bir download görür.
-- **Doğru Content-Length.** Nihai bayt sayısını biliriz; istemciler
-  progress gösterebilir.
-- **Daha kolay test.** `Buffer` dönen bir fonksiyonu test etmek,
-  değiştirilebilir bir `Response`'u poke eden fonksiyonu test etmekten
-  çok daha basittir.
+- **Hata Komutlarındaki Yakalama Determinizmi (Arıza koruma vs determinizimi)** Font ya sistemin Render/çizimi aksadığı vs komut dizesinden/kaza hatasında temiz (`500`) arıza kodunu temiz/mesajı vb verebilmesini (Aksi doğrudan akıtılmasında Tarayıcı "0 KB işlem başarılı indi vs kargaşasını " algılayıcı formlarından ve deşifresinin imkansızlığınından çökmeye / eksik yansıya mani kalkan formül.
+- **Sistem de Yansıtacak `Content-Length`.** Sistemin indiriş süreci başından veri/sayısı dosyanın son (bytes count) boylamına dair Tarayıcına / UI da "Tam inme / progress ilerleci (gösterge komutlarına)" yardım atabilmektedir vs doğruluk/onayı yansıması.
+- **Test komut senaryolu/Aşırı İşlevin Test Edilebilir Basitizimi vs (Unit testing vs)** Gelişine bir Buffer çıktının (Unit-test doğrulamasındaki Response mutable yapısını oynamalara/denemelerinden "milyar defa kolay vs/sade/zahmetsizce") yollatması / kolaycılığı vs testidir.
 
-Varlık (asset) stratejisi:
+Sistem Kaynak/Varlık formülasyon stratejisi:
 
-- Font TTF'leri `backend/src/assets/fonts/` altında durur ve derleme
-  zamanında `nest-cli.json`'un `assets` bloğu ile
-  `backend/dist/assets/fonts/` içine kopyalanır. Runtime'da
-  `__dirname`'e göre çözümlenen path `nest start`, `node dist/main` ve
-  test koşucuları için aynı şekilde çalışır.
+- Projedeki kurgu fontlar vb varlıklardan komuta/merkezlere (`backend/src/assets/fonts/` komut / adreste durması / eklenti (nest-cli.json daki assets alanı derlenmesi üzerinden `backend/dist/assets/fonts/` kopya çekimine `build time` vb de gitmesi)) vs eklentili sistemidir. Motor projenin yolları/test runners komutunda start kurgusu komut testinden arınmış şekilde vs vb `__dirname` den okuma kolay formudur.
 
 ---
 
 ## 14. Güvenlik Yaklaşımı
 
-- **Helmet** standart koruyucu başlıkları koyar (`X-Content-Type-Options`,
-  `Referrer-Policy`, vb.). CSP şimdilik kapalı çünkü Swagger UI ve
-  harici frontend host'ları beyaz liste gerektirirdi; dağıtım sabitlenince
-  bu küçük bir sertleştirme kazanımı olarak eklenebilir.
-- **`@nestjs/throttler`** her isteği hız sınırlar (IP başına dakikada
-  100) ve `POST /auth/login`'i 10/dk ile sıkılaştırıp parola brute
-  force'u köreltir.
-- **CORS** kaynakları `CORS_ORIGIN` (virgülle ayrılmış) envden gelir.
-  Dev için varsayılan `http://localhost:3000`; prodüksiyonda dağıtılmış
-  frontend URL'ine açıkça ayarlanmalı.
-- **Global `ValidationPipe`** `whitelist: true` ve
-  `forbidNonWhitelisted: true` ile çalışır; payload'ta bilinmeyen bir
-  alan varsa hızla hata döner. İmplisit dönüşüm + `class-transformer`
-  query string'leri (`page=2`) sayı olarak güvenli tüketmeyi sağlar.
-- **Parolalar dinlenirken.** bcrypt `saltRounds = 10` ile hashlenir;
-  alan `select: false` olduğundan `findOne` / `findById` hash'i yanlışlıkla
-  dış dünyaya açmaz.
-- **Rol zorunluluğu sunucuda**, istemcide değil. Frontend, admin
-  olmayana "Kullanıcılar" linkini gizleyebilir ama backend `RolesGuard`
-  ile isteği bağımsız olarak reddeder.
-- **`GET /users` hiçbir hassas veri dönmez** — varsayılan şema select
-  ayarları sayesinde yanıtlarda parola alanı yoktur.
+- **Sistemin korumasını Helmet kütüphanesine (Standart API HTTP zırh kalkanı vs eklentileri (X-Content-Options / Referrer vb vs))** teslimi formudur. Swagger UI denetimde dıştan sızmalara engellenmesi kurgulanamayacak csp vs sistem rotalarını yormaz/çökelterek bozukluk hatasının arınmasının basit harden süreç/koruma kurgusu atılmış yansısı formudur.
+- **Hız Komut ve IP İstek sınır kalkanı `@nestjs/throttler`** (default dakikada 100/min yapısına / brute-force hack (brute=şifre kırış testlerine)`POST /auth/login` kurgularında çok limit kısıtlamasına (10 istek formülize rotaya vs) sokan sıkı güvenliktir vs.
+- **CORS Dış yetki kaynak origin izinleri süzgecidir (`CORS_ORIGIN` env parametre verisi virgüllü vs liste ayarları).** Projenin varsayımı vs yerelden de (`localhost`) test/dev çalışmasından girenlerin vs, tamamen projenin yayılma alanında ana Frontend Panel yöneltmeye/izin adres kısıt ayarına çekici ayar verisi formu güvenliği vb.
+- **Komut / DTO denetçisi Global System `ValidationPipe`** komutu (`whitelist: true` ve `forbidNonWhitelisted: true`) ana formlara sarılmış olarak eylemesinden sızma veriyi ("Tanım dışı verilerin direkt red fail i vb vs") fırlatıma ve implicit (sayı / class silsilesinden dönüş kurguları vs güvenlisini sağlar vs.
+- **İşlem de Şifre / At-rest Korumanın bcrypt (salt=10 ile vs) Gizli Komutu**. Uygulama DB taramalarda (`select: false / findOne vs dökümlerinde vb vs` ) sızmamasının kazara formlardan hash okundurtma eylemine kapalı sistem komut onay güvenceli yapısı/sistem verisi vs dir.
+- **İstemci eylemli UI koruma silsilesine değil Backend tarafı API Rota/RolesGuard eylemine teslimat kurgusu (Rol kalkanlı).** Frontend yetkinin sakla uyarısını kılıfına uydurtur (Kullanıcı / Yetki yetkisizi vs UI da göstermese saklamasına (Eklenti/API ler kuralın arkadan denetimiyle API den ret kodu sistem korumalarına tam güvene eylemekte vs)).
+- **Dış listelemeden Kullanıcılardaki (`GET /users` ) Rota Hassasiyet (Şifresiz vs salt data dizimi vs )** Model bazlı yapıda (select ayarları vs) sayesinde gizlilik onayı dış yansımada "düz temiz users vb liste/veri atımı" formu süzgece uyarlanımlış form vs sidir.
 
 ---
 
-## 15. Gözlemlenebilirlik ve Sağlık
+## 15. Gözlemlenebilirlik (Observability) ve Sağlık Denetimi
 
-- **`GET /health`** (Terminus) MongoDB'yi pingler ve bilinen bir JSON
-  şekli döner. Konteyner orkestratörleri, yük dengeleyiciler ve uptime
-  monitörleri bunu poll eder.
-- **NestJS `Logger`** önemli iş olayları için kullanılır (işlem
-  yaratıldı, aşama ilerledi). Prodüksiyonda `LoggerService` arkasına
-  yapılandırılmış bir logger (pino, winston) takılabilir — drop-in
-  yükseltme.
-- **`/docs` üzerinde Swagger UI** hem kendini anlatan API sözleşmesi
-  hem de hızlı debug aracıdır. Operatör JWT'yi yapıştırıp hiçbir şey
-  kurmadan çalışan sistemi keşfedebilir.
+- **API Test rotası (Terminus/`GET /health` ucu)** Mongodb vb anlık ping vs cevap / JSON kalıp mimarisindedir. Projeyi işletmek / izleyen barındırma formlarına (uptime-monitor yük denetim silsilesine / orchestrator sarmallarına vb ) sistemin kalp ritmi anlık yanıt ve onayı döküm testleridir.
+- **Sistem NestJS Logs/Takip İşlemi Çekirdeği** Süreç tetiklemesinin (Yeni komut ekle/Stage aşama eylemi vs iş kaydı kurgusuna vs) atması/yansılaması. Sonradaki / büyük projeksiyon üretimlere `pino / winston / LoggerService` alt kurgularından 10 numara entegre drop-in (Anında formüle entegreli eklenebilecek basit modülize dizin) mimarisi vardır.
+- **Kendini anında Derleyici Özellik /`/docs` altı (Swagger UI)** Proje kurgusuna doküman silsilesine entegre kurgusu ve test formüllerisidir. Developer lara / işletici token/yetkisindeki dış modüllerin "Anında ne varsa oku yansısı / debug et etrafından dolaş vs " kurulum / program barındırmasına ihtiyaç duymaksızın işleyiştir.
 
 ---
 
 ## 16. Test Stratejisi
 
-Sinyal/emek oranına göre üç katman:
+Üç yapıda süzülen; Getiri (Efor - Değer) odaklı optimizasyon katmanı senaryosu kurgulanması tasarısı:
 
-1. **Saf unit testler** (`commission-calculator`, `stage-transitions`).
-   Bu dosyalarda kod başına en yoğun değişmezler vardır; ucuz,
-   deterministik testler en iyi savunmadır.
-2. **Servis düzeyinde unit testler** (`transactions.service.spec.ts`);
-   Mongoose `Model` `getModelToken` aracılığıyla mock'lanır. Yalnızca
-   statik tiplerle çıkarsanamayan orkestrasyon kurallarını kapsar:
-   ilk stage history girdisi, yasak aşama geçişleri, çakışma tespiti,
-   finansal dağılım yan etkisi ve role göre erişim filtre şekli.
-   `chain(resolved)` mock yardımcısı, Mongoose'un akıcı
-   `populate/select/lean/sort/skip/limit/exec` zincirini tek satırda
-   ifade edebilmek için yazılmıştır.
-3. **Uçtan uca smoke testler** (`test/app.e2e-spec.ts`) tüm Nest
-   uygulamasını ayağa kaldırır ve `/health`'in yanıt verdiğini,
-   `/transactions`'ın anonim çağrıları reddettiğini doğrular. E2E
-   kapsamı bilinçli olarak ince — login/create/advance/export gibi
-   akışlar ilgili özelliklerle birlikte büyümeli.
+1. **Saf Matematik birimleri (Pure-Unit sistemleri) `commission-calculator` ile eklenmeli `stage-transitions` silsilesi formları vs.** Projedeki en invariant / kati kural (satır başına komut yoğunluğu kurgu dizesine vs) en kesin defans gücü ucuza kurgulanan hızlı silsile deterministik komut dizgileridir vs vb.
+2. **Servisin API/Mock denetim kurgusu (Unit seviyesi `transactions.service.spec.ts`) yapısının (Mongoose vs Modül simülasyon takas sisteminden `getModelToken` vs) yansısı formu.** Statik okumasının vb vs süzmesine / yetkisinde ötesinde olan eylemcilerin (Audit history silsilesi / hatalı geçitler / Çarpışma conflict tespiti/erişim eylemi filter silsileleri vs) süzümü. Çevik (Fluen-chain takas modeli / `populate/lean vs limit vb execute` simüle komutuna uyarılarak vb) testlerini mükemmel kompakt birer satır mimiğindeki eyleme indirgemesidir vs.
+3. **Geneli test ve Dış kapı onay Duman Senaryoları E2E (Smoke-tests `test/app.e2e-spec.ts` yapısı vs)** App in uyanışı tam tetik eylemini dener / `/health vb vs / transactions red vs/ Anonim eyleme` vs API kapısını yansıtmacısı uyanışı iz süreni testi komut eylemidir. Çok hafif inceltilen derinliğindenden kasıtlı eylemdeki (Login vs ileri vs ilerleme flow uç komutları "Derin akış/dönüşlerine feature vs" ilerde yansın diye geniş yelpazede kaba test uyanış formu kurgucu senaryolu yapısıdır vs vs.
 
-Frontend bileşen testleri bilinçli olarak yazılmamıştır. UI ince ve
-çoğunlukla store'ları render ediyor; Vitest + Testing Library kurulumu
-için ödenen maliyet bu boyutta geri dönmez.
+Arayüz bileşenlerinde Nuxt vs sistemi Testlere vs (Component Vue Frontend süreç test komut eylemine) kasten dâhil etmeme formülasyonlarına (`Vitest + Testing Library` kurulumu ağır bakım/kurgusunda olan vs ) pinia store'una/state üzerinden arayüz işi olan vs sistemdeki kâra ve zararına sarmalına değer efor uyum görmemesindendir vs.
 
 ---
 
-## 17. Geliştirici Deneyimi (DX)
+## 17. Geliştirici Deneyimi
 
-- **`npm run dev`** kökten çalıştırıldığında `concurrently` ile backend
-  ve frontend aynı anda başlar, renk kodlanmış çıktı döner. Terminal
-  jonglörlüğüne gerek kalmaz.
-- **`npm run install:all`** taze bir klonlamayı kök/backend/frontend
-  sırasıyla tek seferde hazırlar.
-- **`npm run seed`** — boş bir veritabanı üzerinde tıklanmaya hazır bir
-  noktaya ulaşmanın deterministik yolu. "Admin'i nasıl oluşturayım?"
-  sürtüşmesini yok eder.
-- **`.env.example` dosyaları** her iki tarafta da env yüzeyini açık ve
-  PR'larda gözden geçirilebilir kılar.
-- **ESLint + Prettier** backend'de stil kaymalarını tutar. Test
-  dosyalarında `unsafe-*` kuralları gevşetilmiştir çünkü Jest mock'ları
-  kaçınılmaz olarak `any` yüzeye çıkarır; "doğru" tipleri yazmak
-  sinyalden çok gürültü üretirdi.
-- **Sıkı TypeScript** her iki tarafta; kamu fonksiyon imzalarında açık
-  tipler. Uygulama kodunda `any` kullanılmaz — union, mapped type ve
-  generic'ler ağır işi görür.
+- Tüm uygulamada (Root taban üzerinden vs `concurrently`) çift taraflı (renk vb yansıma ile) uyarı **sistemsel komut `npm run dev` in kolay akımı/terminal akrobasisinden (sekmeden sekme vb iş / panel silsilelerine) kurtarımı vs dizilimisidir.**
+- Bütün sistemi ana yapı vs/klon vs dizini (`npm run install:all` dizilimiyle root+api+nuxt) tek tık akış kurulum silsilelerine dökücüsüdür/çekici entegre kurgu formu komutları süzgeci işleyişidir.
+- Emlak sistemli kurgu vs de ("Test komutlarında Admin var mıydı vs kargaşa friction vs" eylemesine süzgeçteki idman / `npm run seed`). **Tıklama eylemlik (idempotent / onay denetimli komuta) hazır admin / hazır ekiple vb temiz arayüz testini (Boş veri kurgusundan kurtarma vs) kurgusu formu.**
+- Değişken dizilerini (".env.example yansısı/front back arası çevre sistemlerini") okuma - revize PR testler/işlemleri dizgesinin netliğinden arınma/eksiksizlik formülesidir (Arayüz vs net çevre dizinidir).
+- API format süzgeç komutu olan (**ESLint + Prettier vs**). Arka/Eklenti tarafı Test vs lerde Jest'ten ötürü (mock-simülasyonlar vs Any eylem formüllerinden gümbürtü/uyarı gürültüsünden vb arınma/kapatıcısı / Rahatsızlık uyarı eylem sinyal gürültü kesiş kurallaşmasından (Strict Tip silsilesi rahatlatan testler yansıtır vs)) vs.
+- Uygulama çapındaki (**Düz strict-TypeScript kurguları sarmalı / `Any` silinmiş katı eylem vs tipi silsile yansımasından saf komuta onay vs (Generics / İşaret/Mappaed objeler veri tipleriyle vb)** ağır komutu vs ile oyu alan / üstlenen silsile yansısı vs kurgu formudur vs.
 
 ---
 
-## 18. Ödünleşimler ve İlerisi
+## 18. Ödünleşimler (Trade-offs) ve Gelecekteki Planlar
 
-Kapsam gereği bilerek kabul ettiğimiz ödünleşimler:
+Sistem kurgusunda bilinçli / kapsam onayı kurguladığımız varsayım mimari (trade-offs) dizileri ve listeleme sebepleri vs eylemleri vs:
 
-- **Cookie `HttpOnly` değil.** Basit bir bearer-başlık akışı karşılığında
-  XSS riskini kabul ediyoruz. Prodüksiyonda HttpOnly + Secure +
-  SameSite=lax cookie'lerine geçip API çağrılarını Nuxt sunucusundan
-  proxyleyerek bu riski kapatabilirsin.
-- **Arama regex tabanlı.** Yüzlerce işlem için yeterli; büyük veri
-  kümelerinde MongoDB text index veya Atlas Search tercih edilmelidir.
-- **Soft delete / arşivleme yok.** İşlemler tamamlandıktan sonra
-  yalnızca-ekle mantığıyla yaşar; bu muhasebe zihniyetine uyar ama
-  yaşam döngüsü yönetimi gereksinim olursa değişmesi gerekecektir.
-- **Komisyon oranları kod sabiti.** Ofis başına veya işlem başına
-  override isteniyorsa sabitler bir ayarlar koleksiyonuna taşınıp her
-  işleme anlık görüntü olarak yazılmalıdır.
-- **Tek veritabanı, tek kiracı.** Mevcut model tek kiracılıdır.
-  Multi-tenant dağıtım için her dokümana ve her sorguya bir tenant id
-  eklemek gerekir.
+- **Cookie (Sistem oturumu JWT vs si) HttpOnly'e geçilMEMİŞTİR vs kurgulama formu.** Nuxt Proxy API arayüz yansıtmalardansa vs vb XSS küçük rizikosu sistemin saf Bearer header yansısı sadeliği kurgusundan eylemine alınıp tercih vs onayı kurgusudur. Olası Production mimarilerinde Server Side eylemlere (`HttpOnly+Secure+SameSite=lax` sarmal ve Proxy sistemine) uyarlanısı formüle edilişlidir vs.
+- **Genel Regex Arama Komutu (Regex arama modülü süzgeci).** İdare seviyesinde binli data vb komut sisteminde sorunsuz işleyişe sahip, lakin kurgunun milyon vb (Large dataset sistemine / Mongo Text Index/Atlas formülü dizgesi komutu geçişleri vs) eklenimine itilebilmektedir vs.
+- **Soft-Delete / Data Silim - Arşiv modülü komut kurgu arınması.** Sistem "Kesti / Muhasebeleştirdi" onayı üzerinden eklemeye (Append Onaylı) yapısı vizyondandır. Yaşam döngüsü/yönetim silsilisine kurgu geçilirse ("Komut sil / geri yetki vb") model silsiğine oturtulcaktır vs.
+- **Komisyon Oran vs Constantlara gömülü komut oran pay silsilesi / kod dizesidir.** Müşteri ajans istekler vs de verilerin ayarlar veritabanlarına snapshooth aniden basıp okumaya devşirme senaryolar silsilesine ("Settings collection vs formuna vs") kaydırma modüler sistemi eklentisine açık yansısı durmaktadır vs.
+- **Sistem bütünselliğinde (Tenants silsileriden) Tekli/Single model kullanım kurgusu dizgesi.** Geniş çoklu modelleme komut yansımasında (Multi-tenant eylemine) yapısına kimliği "Tenant ID" eklentisine query ile geçirmeye uygundur (Query/Döküman sistemlerine sızmasından vs yansıyacak süzgece vs).
 
-Değer / emek sırasına göre sonraki adımlar:
+Eklenecek projelerin Vizyon ("Çaba / Değer Kazanım komut sırasına - Value/Effort silsilesine vs") dizilmesi liste yansısı vs formu:
 
-- **Yapılandırılmış log + request id** (pino, korelasyon başlıkları) —
-  prodüksiyon debug'ı için.
-- **Dockerfile + docker-compose** (Mongo + backend + frontend) — onboard
-  hikâyesini `docker compose up` ile tek komuta indirmek.
-- **Dağıtım otomasyonu** (Fly.io / Render / Vercel yapılandırmaları,
-  tek tıkla preview).
-- **Her aşama girdisine not ve ek belge (attachment)** — daha zengin
-  bir denetim anlatısı için.
-- **Soft delete + admin tarafında aşama undo** — mevcut sıkı ileri-yön
-  kuralının yerine.
+- **Correlation başlık / Pino vs Structured (Log ve Çözümcü Eylem/Gözlem vs)** yapısının hata çözümü yetkinliği / debug güvence entegresidir vs.
+- **Genel sistem kurulum paket komut/Docker konteynerleri komutu süzgecinden vs (docker-compose up silsilesinden).** Bir tık onboarding yansısına oturtulması komutundan.
+- **Sistem Yayın Deployment otomasyon dizisi/entegresi vs** (Vercel/Fly vs Render kurgusu depo komutu/PR onay süzgeci/Preview form testler vs pipeline yapısı vs dizimi).
+- **Her sürece Dosya/Açıklama Evrak Notları (Attachments vs Eklenti yansısı) kurgusu silsilesinden vs.** Daha da donanımlı Audit / Muhasebe öykü dökümü kayıt onaması yetkisine süzgeç vs geçittirme komutları vb vs.
+- **Yöneticilerin hatalı/yanlış Stage (Yetkisiz vs vb ileri almalara dur vs / İptal onay / Geri döndürme vs soft delete mekanından sarmallıklardan vs)** yapısına süzgecini ileri gidiş formüllü esneme ve genişletilmesi.
 
 ---
 
-Soru, itiraz ya da iyileştirme fikri her zaman açıktır — bu belgedeki
-her karar, iş bağlamı değişince geri alınabilir.
+Tekrar her konuya kurguya eklentilere / Fikirlere, itiraz vs tasarım geliştirme projenin dinamikiğine katkıya tam onaya eylemine kapılı / geri çevirilebilirliğinin ("Business/İş Akışı/Ortam hedeflerinin esnemesinden ötürü") esneklikten formda yapısında tasarlandığı vizyonundan dır. Okuduğunuz için teşekkürler.
