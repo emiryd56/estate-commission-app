@@ -126,6 +126,54 @@ describe('TransactionsService', () => {
 
       await expect(service.create(baseDto, agentA)).resolves.toBeDefined();
     });
+
+    it('allows agents that list themselves as the selling agent', async () => {
+      const dto = {
+        ...baseDto,
+        listingAgent: otherAgentId,
+        sellingAgent: agentA.userId,
+      };
+      model.create.mockResolvedValue({ _id: new Types.ObjectId(), ...dto });
+
+      await expect(service.create(dto, agentA)).resolves.toBeDefined();
+    });
+
+    it('allows agents that appear on both sides (same agent)', async () => {
+      const dto = {
+        ...baseDto,
+        listingAgent: agentA.userId,
+        sellingAgent: agentA.userId,
+      };
+      model.create.mockResolvedValue({ _id: new Types.ObjectId(), ...dto });
+
+      await expect(service.create(dto, agentA)).resolves.toBeDefined();
+    });
+  });
+
+  describe('findAllPaginated', () => {
+    it('applies search filter as case-insensitive regex', async () => {
+      model.find.mockReturnValue(chain([]));
+      model.countDocuments.mockReturnValue(chain(0));
+
+      await service.findAllPaginated({ page: 1, limit: 10, search: 'Ev' }, admin);
+
+      const [filter] = model.find.mock.calls[0];
+      expect(filter).toHaveProperty('title.$regex', 'Ev');
+      expect(filter).toHaveProperty('title.$options', 'i');
+    });
+
+    it('applies stage filter when provided', async () => {
+      model.find.mockReturnValue(chain([]));
+      model.countDocuments.mockReturnValue(chain(0));
+
+      await service.findAllPaginated(
+        { page: 1, limit: 10, stage: TransactionStage.TITLE_DEED },
+        admin,
+      );
+
+      const [filter] = model.find.mock.calls[0];
+      expect(filter).toMatchObject({ stage: TransactionStage.TITLE_DEED });
+    });
   });
 
   describe('updateStage', () => {

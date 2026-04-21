@@ -96,5 +96,14 @@ describe('calculateCommission', () => {
         calculateCommission(Number.NaN, listingAgentId, sellingAgentId),
       ).toThrow('totalFee must be a non-negative finite number');
     });
+
+    it('does not produce floating-point artefacts on odd numbers', () => {
+      const totalFee = 100_001;
+      const result = calculateCommission(totalFee, listingAgentId, sellingAgentId);
+
+      expect(
+        result.companyCut + result.listingAgentCut + result.sellingAgentCut,
+      ).toBeCloseTo(totalFee, 10);
+    });
   });
 });
