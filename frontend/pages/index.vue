@@ -124,7 +124,7 @@ async function confirmStageAdvance(): Promise<void> {
 
     <template v-else-if="stats">
       <!-- KPI row -->
-      <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <StatCard
           label="Total transactions"
           :value="String(stats.breakdown.total)"

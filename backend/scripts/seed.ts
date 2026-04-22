@@ -39,7 +39,7 @@ interface TransactionTemplate {
 
 function readSeedUsers(): SeedUser[] {
   const adminEmail = (
-    process.env.SEED_ADMIN_EMAIL ?? 'admin@company.com'
+    process.env.SEED_ADMIN_EMAIL ?? 'admin@example.com'
   ).toLowerCase();
   const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'admin123';
   const adminName = process.env.SEED_ADMIN_NAME ?? 'Admin User';

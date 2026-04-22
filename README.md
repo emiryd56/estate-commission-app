@@ -164,7 +164,7 @@ default admin credentials printed by the seed script.
 | `CORS_ORIGIN`         | no       | `http://localhost:3000`    | Comma-separated list of allowed browser origins.                        |
 | `THROTTLE_TTL_MS`     | no       | `60000`                    | Rate limit window for `@nestjs/throttler`.                              |
 | `THROTTLE_LIMIT`      | no       | `100`                      | Max requests per window per IP (default throttler).                     |
-| `SEED_ADMIN_EMAIL`    | no       | `admin@company.com`        | Admin email created by `npm run seed`.                                  |
+| `SEED_ADMIN_EMAIL`    | no       | `admin@example.com`        | Admin email created by `npm run seed`.                                  |
 | `SEED_ADMIN_PASSWORD` | no       | `admin123`                 | Admin password created by `npm run seed`.                               |
 | `SEED_ADMIN_NAME`     | no       | `Admin User`               | Admin display name created by `npm run seed`.                           |
 
@@ -194,7 +194,7 @@ Default credentials (override through env vars listed above):
 
 | Role  | Email                | Password   |
 | ----- | -------------------- | ---------- |
-| admin | `admin@company.com`  | `admin123` |
+| admin | `admin@example.com`  | `admin123` |
 | agent | `alex@company.com`   | `agent123` |
 | agent | `priya@company.com`  | `agent123` |
 | agent | `james@company.com`  | `agent123` |
@@ -290,7 +290,7 @@ route except `POST /auth/login` and `GET /health` requires an
 ```bash
 TOKEN=$(curl -s http://localhost:3001/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@company.com","password":"admin123"}' | jq -r .accessToken)
+  -d '{"email":"admin@example.com","password":"admin123"}' | jq -r .accessToken)
 
 curl -s http://localhost:3001/transactions \
   -H "Authorization: Bearer $TOKEN" | jq '.total, .data[0]'
