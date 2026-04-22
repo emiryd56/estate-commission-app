@@ -1,6 +1,7 @@
 node_modules
 dist
 coverage
+*.tsbuildinfo
 npm-debug.log
 .env
 .env.*
