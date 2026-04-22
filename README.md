@@ -77,7 +77,7 @@ any seeded agent (`alex@company.com` / `agent123`, `priya@company.com` /
 ## Repository Layout
 
 ```
-estate-comission-app/
+estate-commission-app/
 ├── backend/                  # NestJS API
 │   ├── src/
 │   │   ├── auth/             # JWT strategy, guards, login/me controllers

@@ -74,7 +74,7 @@ yapabilirsiniz. Tüm liste için
 ## Depo Düzeni
 
 ```text
-estate-comission-app/
+estate-commission-app/
 ├── backend/                  # NestJS API katmanı
 │   ├── src/
 │   │   ├── auth/             # JWT stratejisi, erişim korumaları (guards), oturum açma (login/me) denetleyicileri
