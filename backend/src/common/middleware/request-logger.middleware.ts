@@ -7,7 +7,7 @@ interface RequestWithUser extends Request {
 
 /**
  * Thin HTTP access log. Logs one line per response:
- *   METHOD /path -> 200 (12ms) user=agent@company.com
+ *   METHOD /path -> 200 (12ms) user=agent@example.com
  *
  * Kept deliberately minimal (no body/headers) so no sensitive data leaks into
  * structured logs. Uses NestJS's own Logger so output goes through the same

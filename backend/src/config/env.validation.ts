@@ -98,5 +98,18 @@ export function validateEnv(
     );
   }
 
+  // Extra production-only hardening: reject short JWT secrets before we even
+  // start accepting login requests. In development we only warn so local
+  // tinkering with a short secret still works.
+  if (validated.JWT_SECRET.length < 32) {
+    const warning =
+      'JWT_SECRET is shorter than 32 characters. Use a long random string (see backend/.env.example).';
+    if (validated.NODE_ENV === 'production') {
+      throw new Error(`Invalid environment configuration:\n  - ${warning}`);
+    }
+    // eslint-disable-next-line no-console
+    console.warn(`[env] Warning: ${warning}`);
+  }
+
   return validated;
 }
