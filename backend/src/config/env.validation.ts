@@ -1,5 +1,7 @@
-import { plainToInstance } from 'class-transformer';
+import { plainToInstance, Transform } from 'class-transformer';
 import {
+  IsBoolean,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -8,14 +10,32 @@ import {
   validateSync,
 } from 'class-validator';
 
+export type NodeEnv = 'development' | 'production' | 'test';
+
+function toBoolean({ value }: { value: unknown }): unknown {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'off', ''].includes(normalized)) return false;
+  }
+  return value;
+}
+
 /**
  * Shape of the environment expected by the backend. Declared with class-validator
  * so that misconfiguration fails fast at startup instead of surfacing on the
  * first request that needs the variable (JWT_SECRET being the classic offender).
  */
 class EnvironmentVariables {
+  @IsOptional()
+  @IsIn(['development', 'production', 'test'])
+  NODE_ENV?: NodeEnv;
+
   @IsString()
-  @IsNotEmpty({ message: 'MONGODB_URI must be set (MongoDB Atlas connection string)' })
+  @IsNotEmpty({
+    message: 'MONGODB_URI must be set (MongoDB Atlas connection string)',
+  })
   MONGODB_URI!: string;
 
   @IsString()
@@ -44,6 +64,11 @@ class EnvironmentVariables {
   @IsInt()
   @Min(1)
   THROTTLE_LIMIT?: number;
+
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  ENABLE_SWAGGER?: boolean;
 }
 
 export function validateEnv(

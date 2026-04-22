@@ -157,7 +157,10 @@ describe('TransactionsService', () => {
       model.find.mockReturnValue(chain([]));
       model.countDocuments.mockReturnValue(chain(0));
 
-      await service.findAllPaginated({ page: 1, limit: 10, search: 'Ev' }, admin);
+      await service.findAllPaginated(
+        { page: 1, limit: 10, search: 'Ev' },
+        admin,
+      );
 
       const [filter] = model.find.mock.calls[0];
       expect(filter).toHaveProperty('title.$regex', 'Ev');
@@ -383,7 +386,9 @@ describe('TransactionsService', () => {
       expect(result.topAgents).toEqual([]);
 
       // Agent-scoped pipelines must match through the $or access filter.
-      const [firstCall] = aggregate.mock.calls[0] as [Array<{ $match?: unknown }>];
+      const [firstCall] = aggregate.mock.calls[0] as [
+        Array<{ $match?: unknown }>,
+      ];
       expect(firstCall[0]).toHaveProperty('$match.$or');
     });
 
@@ -411,7 +416,9 @@ describe('TransactionsService', () => {
       expect(result.topAgents[0].name).toBe('Ahmet');
 
       // Admin stage breakdown must not be access-filtered.
-      const [firstCall] = aggregate.mock.calls[0] as [Array<{ $match?: unknown }>];
+      const [firstCall] = aggregate.mock.calls[0] as [
+        Array<{ $match?: unknown }>,
+      ];
       expect(firstCall[0]).toEqual({ $match: {} });
     });
 

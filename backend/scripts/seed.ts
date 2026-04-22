@@ -27,6 +27,18 @@ function readSeedUsers(): SeedUser[] {
 }
 
 async function run(): Promise<void> {
+  // Guard against accidentally seeding the production database with the
+  // well-known default credentials. Must be bypassed explicitly.
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.ALLOW_SEED_IN_PRODUCTION !== 'true'
+  ) {
+    console.error(
+      'Refusing to seed with NODE_ENV=production. Set ALLOW_SEED_IN_PRODUCTION=true if you really mean it.',
+    );
+    process.exit(1);
+  }
+
   const uri = process.env.MONGODB_URI;
   if (!uri) {
     console.error('MONGODB_URI is not defined in .env');

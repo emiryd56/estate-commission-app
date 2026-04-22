@@ -30,7 +30,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Sign in with email & password' })
-  @ApiResponse({ status: 200, description: 'Returns an access token and the authenticated user.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns an access token and the authenticated user.',
+  })
   @ApiResponse({ status: 401, description: 'Invalid credentials.' })
   @ApiResponse({ status: 429, description: 'Too many login attempts.' })
   login(@Body() dto: LoginDto): Promise<LoginResponse> {
@@ -41,7 +44,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get the currently authenticated user' })
-  @ApiResponse({ status: 200, description: 'The current user payload decoded from the JWT.' })
+  @ApiResponse({
+    status: 200,
+    description: 'The current user payload decoded from the JWT.',
+  })
   @ApiResponse({ status: 401, description: 'Missing or invalid access token.' })
   me(@CurrentUser() user: AuthenticatedUser): AuthenticatedUser {
     return user;

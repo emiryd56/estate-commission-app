@@ -78,7 +78,8 @@ export class PaginationQueryDto {
   endDate?: string;
 
   @ApiPropertyOptional({
-    description: 'Restrict results to transactions involving this agent (admin only).',
+    description:
+      'Restrict results to transactions involving this agent (admin only).',
   })
   @IsOptional()
   @IsMongoId()

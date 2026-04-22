@@ -34,6 +34,7 @@ export const useAuthStore = defineStore('auth', {
         const tokenCookie = useCookie<string | null>('token', {
           maxAge: 60 * 60 * 24,
           sameSite: 'lax',
+          secure: !import.meta.dev,
         })
         tokenCookie.value = response.accessToken
         this.user = response.user

@@ -336,12 +336,10 @@ interface PaginatedResult<T> {
   total: number;
   page: number;
   totalPages: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
 }
 ```
 
-`hasNextPage` / `hasPrevPage` backend tarafında hesaplanır; böylece frontend'in "Önceki/Sonraki" butonlarını çizerken `page < totalPages && totalPages > 0` aritmetiğini tekrar etmesi gerekmez, yalnızca flag'i okur. Frontend bu sözleşmeyi tablo altında "Sayfa X / Y" ve "Önceki / Sonraki" butonlarına çevirir. Tüm filtreler (arama, aşama, fiyat aralığı, tarih aralığı, danışman) aynı `fetchTransactions` action'ı üzerinden çalışır; query string inşası store'un sorumluluğundadır. Bu, API çağrısının bileşenler arasında tekrar etmesini engeller.
+Frontend, Önceki/Sonraki buton durumlarını tek bir `page < totalPages && totalPages > 0` kontrolüyle türetir; hat üzerinde gereksiz boolean alanlar taşınmaz. Store bu sözleşmeyi "Sayfa X / Y" etiketi ve Önceki/Sonraki butonlarına dönüştürür. Tüm filtreler (arama, aşama, fiyat aralığı, tarih aralığı, danışman) aynı `fetchTransactions` action'ı üzerinden çalışır; query string inşası store'un sorumluluğundadır. Bu, API çağrısının bileşenler arasında tekrar etmesini engeller.
 
 ### 8.4 `useApi` Composable'ı ve Token Akışı
 
@@ -434,9 +432,9 @@ Log seviyesi status'ü takip eder: `2xx → LOG`, `4xx → WARN`, `5xx → ERROR
 
 ## 10. Test Stratejisi
 
-Test stratejisi, Bölüm 5'te açıklanan izolasyon ilkesine dayanır. Domain logic saf fonksiyonlarda toplandığından, testlerin büyük kısmı altyapı dokunmadan yazılabilir.
+Test stratejisi, Bölüm 5'te açıklanan izolasyon ilkesine dayanır. Domain logic saf fonksiyonlarda toplandığından, tüm test paketi altyapı dokunmadan yazılır — MongoDB Memory Server, test container ya da fixture gerekmez.
 
-Test paketi "test piramidi" biçiminde örgütlenmiştir: geniş tabanda saf fonksiyonları doğrulayan hızlı unit testler, orta katmanda Mongoose modeli mock'lanmış servis testleri, tepede ayağa kaldırılmış Nest uygulamasına atılan az sayıda uçtan uca (e2e) testler.
+Paket iki katmandan oluşur: geniş tabanda saf fonksiyonları doğrulayan hızlı unit testler ve orta katmanda Mongoose modeli mock'lanmış servis testleri.
 
 ### 10.1 Unit Testler — Saf Fonksiyonlar
 
@@ -481,16 +479,7 @@ Test paketi "test piramidi" biçiminde örgütlenmiştir: geniş tabanda saf fon
 | `findOne` erişim kontrolü | `applies an access filter for agents to prevent viewing foreign transactions` | Danışman sorgusuna `$or` filtresi eklenir (bkz. Bölüm 7). |
 | `findOne` erişim kontrolü | `does not restrict admins via an access filter` | Admin sorgusunda `$or` filtresi yer almaz. |
 
-### 10.3 Uçtan Uca (E2E) Testler
-
-**`backend/test/app.e2e-spec.ts`** — tüm Nest uygulamasını ayağa kaldırır ve HTTP sözleşmesini doğrular.
-
-| Test case | Amaç |
-| --- | --- |
-| `GET /health returns 200 when the DB is reachable` | Sağlık probe'u; Mongo ayaktaysa 200, değilse 503 döner. |
-| `GET /transactions returns 401 without a token` | `JwtAuthGuard`, anonim erişimi sınırda engeller. |
-
-Bu üç katman birlikte, tip sisteminin tek başına garanti edemediği üç sorumluluğu kapsar: mali aritmetik, durum makinesi ve rol tabanlı erişim kontrolü.
+Bu iki katman birlikte, tip sisteminin tek başına garanti edemediği üç sorumluluğu kapsar: mali aritmetik, durum makinesi ve rol tabanlı erişim kontrolü. HTTP sarmalı (guard, pipe, filter) geliştirme sırasında canlı API'ye yapılan çağrılar ve Swagger arayüzü üzerinden deneniyor; ayrı bir e2e iskeleti tekrara düşeceği için tutulmuyor.
 
 ---
 

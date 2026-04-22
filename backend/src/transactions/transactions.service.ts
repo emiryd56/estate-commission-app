@@ -279,7 +279,10 @@ export class TransactionsService {
 
     const total = Object.values(byStage).reduce((sum, n) => sum + n, 0);
     const completed = byStage[TransactionStage.COMPLETED];
-    const active = ACTIVE_STAGES.reduce((sum, stage) => sum + byStage[stage], 0);
+    const active = ACTIVE_STAGES.reduce(
+      (sum, stage) => sum + byStage[stage],
+      0,
+    );
 
     return { total, active, completed, byStage, completedFeeSum };
   }
@@ -308,11 +311,7 @@ export class TransactionsService {
             total: { $sum: perUserCut },
             thisMonth: {
               $sum: {
-                $cond: [
-                  { $gte: ['$updatedAt', monthStart] },
-                  perUserCut,
-                  0,
-                ],
+                $cond: [{ $gte: ['$updatedAt', monthStart] }, perUserCut, 0],
               },
             },
           },

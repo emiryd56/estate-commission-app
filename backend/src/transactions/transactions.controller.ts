@@ -46,7 +46,8 @@ export class TransactionsController {
   @ApiResponse({ status: 201, description: 'Transaction created.' })
   @ApiResponse({
     status: 403,
-    description: 'Agent attempted to create a transaction they are not part of.',
+    description:
+      'Agent attempted to create a transaction they are not part of.',
   })
   create(
     @Body() dto: CreateTransactionDto,
@@ -71,19 +72,26 @@ export class TransactionsController {
 
   @Get('stats')
   @ApiOperation({ summary: 'Dashboard aggregates (scoped to the caller)' })
-  @ApiResponse({ status: 200, description: 'Breakdown, earnings, recent lists and top agents.' })
-  getStats(
-    @CurrentUser() user: AuthenticatedUser,
-  ): Promise<TransactionStats> {
+  @ApiResponse({
+    status: 200,
+    description: 'Breakdown, earnings, recent lists and top agents.',
+  })
+  getStats(@CurrentUser() user: AuthenticatedUser): Promise<TransactionStats> {
     return this.transactionsService.getStats(user);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Fetch a transaction by id' })
   @ApiParam({ name: 'id', description: 'Transaction ObjectId' })
-  @ApiResponse({ status: 200, description: 'Transaction document with populated agents.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Transaction document with populated agents.',
+  })
   @ApiResponse({ status: 404, description: 'Transaction not found.' })
-  @ApiResponse({ status: 403, description: 'Agent cannot access another agent\'s transaction.' })
+  @ApiResponse({
+    status: 403,
+    description: "Agent cannot access another agent's transaction.",
+  })
   findOne(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -100,7 +108,10 @@ export class TransactionsController {
   @ApiParam({ name: 'id', description: 'Transaction ObjectId' })
   @ApiResponse({ status: 200, description: 'Transaction updated.' })
   @ApiResponse({ status: 400, description: 'Invalid stage transition.' })
-  @ApiResponse({ status: 409, description: 'Concurrent stage change detected.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Concurrent stage change detected.',
+  })
   updateStage(
     @Param('id') id: string,
     @Body() dto: UpdateTransactionStageDto,

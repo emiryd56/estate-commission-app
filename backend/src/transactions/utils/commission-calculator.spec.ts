@@ -99,7 +99,11 @@ describe('calculateCommission', () => {
 
     it('does not produce floating-point artefacts on odd numbers', () => {
       const totalFee = 100_001;
-      const result = calculateCommission(totalFee, listingAgentId, sellingAgentId);
+      const result = calculateCommission(
+        totalFee,
+        listingAgentId,
+        sellingAgentId,
+      );
 
       expect(
         result.companyCut + result.listingAgentCut + result.sellingAgentCut,

@@ -51,7 +51,7 @@ A deeper dive into the design rationale lives in [`DESIGN.md`](./DESIGN.md).
 | Frontend framework | Nuxt 3 (Vue 3, Vite, Nitro)                                         |
 | State management   | Pinia (auth, users, transactions stores)                            |
 | Styling            | Tailwind CSS + custom `SearchableSelect` component                  |
-| Testing            | Jest (backend unit + e2e), `vue-tsc` / `tsc` type checks            |
+| Testing            | Jest (backend unit & service tests), `vue-tsc` / `tsc` type checks  |
 | Tooling            | ESLint + Prettier (backend), `concurrently` for single-command dev  |
 
 ---
@@ -73,8 +73,7 @@ estate-comission-app/
 │   ├── scripts/
 │   │   ├── seed.ts           # Creates admin + a few consultants
 │   │   └── promote-admin.ts  # Promotes an existing user to admin
-│   ├── src/assets/fonts/     # DejaVu TTFs used by pdfkit
-│   └── test/                 # e2e tests
+│   └── src/assets/fonts/     # DejaVu TTFs used by pdfkit
 ├── frontend/                 # Nuxt 3 client
 │   ├── pages/                # login, dashboard (index), /transactions/[id], new, users
 │   ├── components/           # SearchableSelect.vue (generic combobox)
@@ -233,14 +232,11 @@ protected endpoints).
 ## Testing
 
 ```bash
-# Backend unit tests (Jest, 36 cases across commission, transitions, service)
+# Backend unit & service tests (Jest, 44 cases across commission, transitions, service)
 npm test
 
 # Backend coverage report (writes to backend/coverage/)
 npm run test:cov
-
-# Backend e2e (spins up the Nest app; requires MONGODB_URI)
-npm --prefix backend run test:e2e
 
 # Frontend type check
 npm --prefix frontend exec vue-tsc -- --noEmit
@@ -266,7 +262,7 @@ route except `POST /auth/login` and `GET /health` requires an
 | Method | Path                          | Roles          | Notes                                                       |
 | ------ | ----------------------------- | -------------- | ----------------------------------------------------------- |
 | POST   | `/auth/login`                 | public         | Returns `{ accessToken, user }`. Rate-limited (10/min).     |
-| GET    | `/auth/me`                    | any auth       | Returns the decoded token's `{ userId, email, role }`.      |
+| GET    | `/auth/me`                    | any auth       | Returns the decoded token's `{ userId, name, email, role }`. |
 | POST   | `/users`                      | admin               | Creates a user (consultant or admin).                       |
 | GET    | `/users`                      | admin, consultant   | Lists users (used by consultant pickers).                   |
 | GET    | `/transactions`               | admin, consultant   | Paginated list; supports `search`, `stage`, price/date/consultant filters. |
@@ -328,8 +324,8 @@ curl -s http://localhost:3001/transactions \
   DejaVu fonts bundled as Nest assets to render Turkish characters.
 - **Concurrency safety** — Stage advances use `findOneAndUpdate` gated on
   the current stage, so two simultaneous writers cannot both win.
-- **Audit trail** — Every `StageHistoryEntry` records `changedBy`, enabling
-  future per-user activity reporting.
+- **Audit trail** — Every `StageHistoryEntry` records `changedBy`, and the
+  transaction timeline surfaces it inline (`{date} · {name} tarafından`).
 
 ---
 
@@ -432,7 +428,6 @@ Backend-local scripts (from `backend/`) of interest:
 | ---------------------------- | -------------------------------------------------------- |
 | `npm run start:dev`          | NestJS in watch mode.                                    |
 | `npm run start:prod`         | Runs compiled `dist/main.js`.                            |
-| `npm run test:e2e`           | Jest end-to-end suite.                                   |
 | `npm run seed`               | `scripts/seed.ts` via `ts-node`.                         |
 | `npm run promote-admin`      | Promotes an existing email to `admin`.                   |
 

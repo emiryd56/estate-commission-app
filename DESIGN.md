@@ -338,12 +338,10 @@ interface PaginatedResult<T> {
   total: number;
   page: number;
   totalPages: number;
-  hasNextPage: boolean;
-  hasPrevPage: boolean;
 }
 ```
 
-`hasNextPage` / `hasPrevPage` are computed server-side so the frontend never has to repeat the `page < totalPages && totalPages > 0` arithmetic; the Previous/Next buttons simply read the flag. The frontend translates this contract into "Page X / Y" labels and Previous/Next buttons below the table. Every filter (search, stage, fee range, date range, agent) flows through the same `fetchTransactions` action; building the query string is the store's responsibility. That prevents the API call from being duplicated across components.
+The frontend derives Previous/Next availability from a single `page < totalPages && totalPages > 0` check — no redundant boolean flags travel over the wire. The store translates this contract into "Page X / Y" labels and Previous/Next buttons below the table. Every filter (search, stage, fee range, date range, agent) flows through the same `fetchTransactions` action; building the query string is the store's responsibility. That prevents the API call from being duplicated across components.
 
 ### 8.4 The `useApi` Composable and Token Flow
 
@@ -436,9 +434,9 @@ The log level follows the status: `2xx → LOG`, `4xx → WARN`, `5xx → ERROR`
 
 ## 10. Testing Strategy
 
-The testing strategy relies on the isolation principle described in Section 5. Because domain logic is concentrated in pure functions, the bulk of the test suite is written without touching infrastructure.
+The testing strategy relies on the isolation principle described in Section 5. Because domain logic is concentrated in pure functions, the whole test suite is written without touching infrastructure — no MongoDB Memory Server, no test containers, no fixtures.
 
-The suite is organized along the "test pyramid": a wide base of fast unit tests on pure functions, a mid-layer of service tests with mocked Mongoose models, and a thin top layer of end-to-end tests against a booted Nest application.
+The suite is organized in two layers: a wide base of fast unit tests on pure functions, and a mid-layer of service tests that mock the Mongoose model.
 
 ### 10.1 Unit Tests — Pure Functions
 
@@ -483,16 +481,7 @@ The suite is organized along the "test pyramid": a wide base of fast unit tests 
 | `findOne` access control | `applies an access filter for agents to prevent viewing foreign transactions` | Agent queries receive an `$or` filter (see Section 7). |
 | `findOne` access control | `does not restrict admins via an access filter` | Admin queries carry no `$or` filter. |
 
-### 10.3 End-to-End Tests
-
-**`backend/test/app.e2e-spec.ts`** — boots the full Nest app and asserts the HTTP contract.
-
-| Test case | Intent |
-| --- | --- |
-| `GET /health returns 200 when the DB is reachable` | The health probe returns an `x` status (200 when Mongo is up, 503 otherwise). |
-| `GET /transactions returns 401 without a token` | `JwtAuthGuard` blocks anonymous access at the edge. |
-
-Together, these layers cover the three responsibilities that cannot be checked by the type system alone: financial arithmetic, the state machine, and role-based access control.
+Together, these two layers cover the three responsibilities that cannot be checked by the type system alone: financial arithmetic, the state machine, and role-based access control. HTTP wiring (auth guards, pipes, filters) is exercised at dev time against the live API and through Swagger's interactive console rather than a duplicated e2e harness.
 
 ---
 
