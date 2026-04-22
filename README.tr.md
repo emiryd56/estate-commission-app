@@ -13,6 +13,26 @@ Sistemin arkasında yatan mimari kararları, tercihleri ve detaylı kurgusunu in
 
 ---
 
+## Canlı Dağıtım (Live Deployment)
+
+Uygulama deploy edilmiş ve herkese açık erişilebilir durumda:
+
+| Servis   | URL                                               |
+| -------- | ------------------------------------------------- |
+| Frontend | [https://estate-comission-app.vercel.app](https://estate-comission-app.vercel.app)                          |
+| Backend  | [https://estate-comission-app.onrender.com](https://estate-comission-app.onrender.com)                            |
+| Health   | [https://estate-comission-app.onrender.com/health](https://estate-comission-app.onrender.com/health)              |
+
+Seed admin hesabıyla (`admin@example.com` / `admin123`) veya seed'lenmiş
+danışmanlardan biriyle (`alex@company.com` / `agent123`,
+`priya@company.com` / `agent123`, `james@company.com` / `agent123`) giriş
+yapabilirsiniz. Tüm liste için
+[Varsayılan Kullanıcıları Oluşturma (Seeding)](#varsayılan-kullanıcıları-oluşturma-seeding) bölümüne bakın.
+
+> Backend, Render'ın ücretsiz katmanında barındırıldığı için uzun süre
+> kullanılmadığında ilk istek instance uyanırken yaklaşık 30 saniye
+> sürebilir.
+
 ## İçindekiler
 
 1. [Teknoloji Yığını](#teknoloji-yığını)

@@ -497,3 +497,16 @@ Gelecek iterasyonlar için olası gelişmeler: WebSocket üzerinden canlı aşam
 ---
 
 *Bu doküman kodla birlikte güncel tutulmalıdır. Mimari bir karar değiştiğinde ilgili bölüm revize edilmelidir.*
+
+---
+
+## Canlı Dağıtım
+
+- **Frontend:** https://estate-comission-app.vercel.app (Vercel)
+- **Backend:** https://estate-comission-app.onrender.com (Render)
+- **Health probe:** https://estate-comission-app.onrender.com/health
+
+Backend MongoDB Atlas M0 cluster'ına bağlanır. Sırlar (veritabanı URI'si,
+JWT secret, CORS origin) her bir hosting sağlayıcısının environment
+yapılandırmasında tutulur ve hiçbir zaman repo'ya commit edilmez.
+

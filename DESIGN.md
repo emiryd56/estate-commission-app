@@ -499,3 +499,16 @@ Possible improvements for future iterations: live stage updates over WebSocket, 
 ---
 
 *This document must stay in sync with the code. When an architectural decision changes, the relevant section should be revised.*
+
+---
+
+## Live Deployment
+
+- **Frontend:** https://estate-comission-app.vercel.app (Vercel)
+- **Backend:** https://estate-comission-app.onrender.com (Render)
+- **Health probe:** https://estate-comission-app.onrender.com/health
+
+The backend connects to a MongoDB Atlas M0 cluster. Secrets (database URI,
+JWT secret, CORS origin) live in each hosting provider's environment
+configuration and are never committed to the repository.
+

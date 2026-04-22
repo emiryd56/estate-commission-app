@@ -18,6 +18,24 @@ A deeper dive into the design rationale lives in [`DESIGN.md`](./DESIGN.md).
 
 ---
 
+## Live Deployment
+
+The app is deployed and publicly reachable:
+
+| Service  | URL                                               |
+| -------- | ------------------------------------------------- |
+| Frontend | [https://estate-comission-app.vercel.app](https://estate-comission-app.vercel.app)                          |
+| Backend  | [https://estate-comission-app.onrender.com](https://estate-comission-app.onrender.com)                            |
+| Health   | [https://estate-comission-app.onrender.com/health](https://estate-comission-app.onrender.com/health)              |
+
+Sign in with the seed admin credentials (`admin@example.com` / `admin123`) or
+any seeded agent (`alex@company.com` / `agent123`, `priya@company.com` /
+`agent123`, `james@company.com` / `agent123`). See
+[Seeding Default Accounts](#seeding-default-accounts) for the full list.
+
+> The backend is hosted on Render's free tier, so the first request after a
+> period of inactivity may take ~30 seconds while the instance wakes up.
+
 ## Table of Contents
 
 1. [Tech Stack](#tech-stack)
